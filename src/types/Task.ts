@@ -1,6 +1,5 @@
 // Task interface definition
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
-export type TaskPriority = 'low' | 'medium' | 'high';
 
 /** ISO 4217 monetary amount (e.g. { amount: 1500, currency: "EUR" }) */
 export interface Money {
@@ -32,26 +31,23 @@ export interface Task {
   title: string;
   description: string;
   status: TaskStatus;
-  priority: TaskPriority;
   createdAt: string;
   updatedAt: string;
   dueDate?: string;
   tags: string[];
-  // --- Priority score inputs ---
+  // --- Priority score inputs (required) ---
   /** Monetary value of the task (direct amount or event expected value) */
-  taskValue?: TaskValue;
+  taskValue: TaskValue;
   /** Target delivery date as an ISO date string, or as a Duration relative to "now" */
-  targetDelivery?: string | Duration;
+  targetDelivery: string | Duration;
   /** Estimated remaining work duration */
-  remainingEstimate?: Duration;
-  /** ID of the TaskGroup this task belongs to */
-  groupId?: string;
+  remainingEstimate: Duration;
+  /** ID of the parent task (if this task is a sub-task) */
+  parentId?: string;
 }
 
 export interface TaskFilter {
   status?: TaskStatus;
-  priority?: TaskPriority;
   search?: string;
-  groupId?: string;
   sortByScore?: boolean;
 }

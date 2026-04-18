@@ -75,18 +75,12 @@ export function computeTaskValue(taskValue: TaskValue): number {
  *
  *   Score = V              when R ≤ 1  (deadline is reachable or already past)
  *   Score = V × e^(−k×(R−1))  when R > 1  (more time available than needed)
- *
- * Returns `null` when `taskValue`, `targetDelivery`, or `remainingEstimate` is absent.
  */
 export function computePriorityScore(
   task: Task,
   priorityCoefficient = 1.0,
   now = Date.now(),
-): number | null {
-  if (!task.taskValue || !task.targetDelivery || !task.remainingEstimate) {
-    return null;
-  }
-
+): number {
   const V = computeTaskValue(task.taskValue);
   const E = parseDuration(task.remainingEstimate.iso);
   if (E <= 0) return V;

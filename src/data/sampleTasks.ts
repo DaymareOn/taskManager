@@ -25,7 +25,6 @@ export const sampleTasks: Task[] = [
     description:
       'Complete and submit the annual income tax return before the April 1st deadline. Gather all W-2s, 1099s, and deductible expense receipts.',
     status: 'todo',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 90), // 2026-04-01
     tags: ['finance', 'admin', 'annual'],
     createdAt: offsetDate(SEED_DATE, 9, 9, 0), // 2026-01-10T09:00:00.000Z
@@ -40,11 +39,13 @@ export const sampleTasks: Task[] = [
     description:
       'Call the roof maintenance company to schedule a cleaning and inspection. Last done 18 months ago — check for moss and blocked gutters.',
     status: 'todo',
-    priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 134), // 2026-05-15
     tags: ['home', 'maintenance'],
     createdAt: offsetDate(SEED_DATE, 33, 11, 30), // 2026-02-03T11:30:00.000Z
     updatedAt: offsetDate(SEED_DATE, 33, 11, 30),
+    taskValue: { type: 'direct', amount: { amount: 300, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 134),
+    remainingEstimate: { iso: 'PT1H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000003',
@@ -52,11 +53,13 @@ export const sampleTasks: Task[] = [
     description:
       "Submit the nanny's monthly salary slips to the social security office. Include hours worked, gross pay, and any reimbursed expenses.",
     status: 'in-progress',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 119), // 2026-04-30
     tags: ['finance', 'admin', 'childcare'],
     createdAt: offsetDate(SEED_DATE, 59, 8, 0), // 2026-03-01T08:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 90, 14, 20), // 2026-04-01T14:20:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 800, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 119),
+    remainingEstimate: { iso: 'PT2H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000004',
@@ -64,7 +67,6 @@ export const sampleTasks: Task[] = [
     description:
       "Home insurance expires at the end of the month. Compare quotes from at least three providers before renewing. Check that coverage includes the new garden shed.",
     status: 'todo',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 117), // 2026-04-28
     tags: ['finance', 'home', 'insurance'],
     createdAt: offsetDate(SEED_DATE, 73, 10, 0), // 2026-03-15T10:00:00.000Z
@@ -84,11 +86,13 @@ export const sampleTasks: Task[] = [
     description:
       "Schedule a 6-month check-up and hygienist appointment for the whole family. Last visit was October — don't forget to check school schedules before booking.",
     status: 'todo',
-    priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 120), // 2026-05-01
     tags: ['health', 'family'],
     createdAt: offsetDate(SEED_DATE, 78, 9, 15), // 2026-03-20T09:15:00.000Z
     updatedAt: offsetDate(SEED_DATE, 78, 9, 15),
+    taskValue: { type: 'direct', amount: { amount: 200, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 120),
+    remainingEstimate: { iso: 'PT30M' },
   },
   {
     id: '00000000-0000-0000-0000-000000000006',
@@ -96,7 +100,6 @@ export const sampleTasks: Task[] = [
     description:
       'Book the car in for its annual service and MOT test. Due by end of April. Request brake pad check and tyre rotation as well.',
     status: 'in-progress',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 114), // 2026-04-25
     tags: ['auto', 'maintenance'],
     createdAt: offsetDate(SEED_DATE, 86, 8, 45), // 2026-03-28T08:45:00.000Z
@@ -111,11 +114,13 @@ export const sampleTasks: Task[] = [
     description:
       'Electricity bill for Q1 is due. Submit meter reading online and pay via bank transfer. Check if direct debit needs to be updated.',
     status: 'done',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 89), // 2026-03-31
     tags: ['finance', 'utilities'],
     createdAt: offsetDate(SEED_DATE, 59, 7, 30), // 2026-03-01T07:30:00.000Z
     updatedAt: offsetDate(SEED_DATE, 86, 10, 10), // 2026-03-28T10:10:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 180, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 89),
+    remainingEstimate: { iso: 'PT30M' },
   },
   {
     id: '00000000-0000-0000-0000-000000000008',
@@ -123,11 +128,13 @@ export const sampleTasks: Task[] = [
     description:
       "Purchase the stationery items on the school's supply list for the new term: notebooks, coloured pencils, ruler, glue sticks, and a new backpack.",
     status: 'done',
-    priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 63), // 2026-03-05
     tags: ['family', 'school', 'shopping'],
     createdAt: offsetDate(SEED_DATE, 50, 12, 0), // 2026-02-20T12:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 62, 18, 0), // 2026-03-04T18:00:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 80, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 63),
+    remainingEstimate: { iso: 'PT2H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000009',
@@ -135,11 +142,13 @@ export const sampleTasks: Task[] = [
     description:
       'Research destinations for a 2-week summer holiday in July or August. Compare flight and accommodation packages. Check passport expiry dates for all family members.',
     status: 'in-progress',
-    priority: 'low',
     dueDate: offsetDateOnly(SEED_DATE, 151), // 2026-06-01
     tags: ['family', 'travel', 'leisure'],
     createdAt: offsetDate(SEED_DATE, 44, 20, 0), // 2026-02-14T20:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 68, 21, 30), // 2026-03-10T21:30:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 3000, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 151),
+    remainingEstimate: { iso: 'P3D' },
   },
   {
     id: '00000000-0000-0000-0000-000000000010',
@@ -147,10 +156,12 @@ export const sampleTasks: Task[] = [
     description:
       'The cold tap in the bathroom has been dripping for a week. Replace the washer or call a plumber if the cartridge is worn. Turn off water supply before starting.',
     status: 'todo',
-    priority: 'medium',
     tags: ['home', 'repairs'],
     createdAt: offsetDate(SEED_DATE, 94, 17, 0), // 2026-04-05T17:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 94, 17, 0),
+    taskValue: { type: 'direct', amount: { amount: 150, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 180),
+    remainingEstimate: { iso: 'PT3H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000011',
@@ -158,10 +169,12 @@ export const sampleTasks: Task[] = [
     description:
       'Create a written and photographic inventory of home contents for insurance purposes. Store a copy in cloud storage and share with the insurance provider.',
     status: 'todo',
-    priority: 'low',
     tags: ['home', 'admin', 'insurance'],
     createdAt: offsetDate(SEED_DATE, 76, 14, 0), // 2026-03-18T14:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 76, 14, 0),
+    taskValue: { type: 'direct', amount: { amount: 100, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 270),
+    remainingEstimate: { iso: 'P1D' },
   },
   {
     id: '00000000-0000-0000-0000-000000000012',
@@ -169,11 +182,13 @@ export const sampleTasks: Task[] = [
     description:
       'Driving licence expires in June. Complete the DVLA online renewal form, upload a recent photo, and pay the renewal fee.',
     status: 'todo',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 139), // 2026-05-20
     tags: ['admin', 'legal'],
     createdAt: offsetDate(SEED_DATE, 91, 9, 0), // 2026-04-02T09:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 91, 9, 0),
+    taskValue: { type: 'direct', amount: { amount: 500, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 139),
+    remainingEstimate: { iso: 'PT1H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000013',
@@ -181,10 +196,12 @@ export const sampleTasks: Task[] = [
     description:
       'Open a dedicated high-interest savings account and automate a monthly transfer to build a 3-month emergency fund. Research ISA vs regular savings account options.',
     status: 'in-progress',
-    priority: 'medium',
     tags: ['finance', 'savings'],
     createdAt: offsetDate(SEED_DATE, 0, 0, 0), // 2026-01-01T00:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 45, 11, 0), // 2026-02-15T11:00:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 5000, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 365),
+    remainingEstimate: { iso: 'P2D' },
   },
   {
     id: '00000000-0000-0000-0000-000000000014',
@@ -192,10 +209,12 @@ export const sampleTasks: Task[] = [
     description:
       "Sort through the kids' outgrown clothes, unused toys, and old books. Bag items in good condition for the local charity shop and arrange a drop-off.",
     status: 'done',
-    priority: 'low',
     tags: ['home', 'family', 'charity'],
     createdAt: offsetDate(SEED_DATE, 31, 10, 0), // 2026-02-01T10:00:00.000Z
     updatedAt: offsetDate(SEED_DATE, 52, 15, 45), // 2026-02-22T15:45:00.000Z
+    taskValue: { type: 'direct', amount: { amount: 50, currency: 'EUR' } },
+    targetDelivery: offsetDateOnly(SEED_DATE, 60),
+    remainingEstimate: { iso: 'PT3H' },
   },
   {
     id: '00000000-0000-0000-0000-000000000015',
@@ -203,7 +222,6 @@ export const sampleTasks: Task[] = [
     description:
       "Review the existing will with a solicitor following the birth of a second child. Update beneficiaries, guardianship clauses, and the executor's contact details.",
     status: 'todo',
-    priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 181), // 2026-07-01
     tags: ['legal', 'admin', 'finance'],
     createdAt: offsetDate(SEED_DATE, 83, 10, 30), // 2026-03-25T10:30:00.000Z

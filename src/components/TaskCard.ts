@@ -1,19 +1,13 @@
 import type { Task } from '../types/Task';
 import { DOM } from '../utils/dom';
 import { useTaskStore } from '../store/taskStore';
-import { useGroupStore } from '../store/groupStore';
 import { computePriorityScore, computeTaskValue, formatMoney } from '../utils/priority';
+import { TaskForm } from './TaskForm';
 
 const STATUS_LABELS: Record<Task['status'], string> = {
   todo: 'To Do',
   'in-progress': 'In Progress',
   done: 'Done',
-};
-
-const PRIORITY_LABELS: Record<Task['priority'], string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
 };
 
 const STATUS_NEXT: Record<Task['status'], Task['status']> = {
@@ -22,16 +16,28 @@ const STATUS_NEXT: Record<Task['status'], Task['status']> = {
   done: 'todo',
 };
 
-export const TaskCard = (task: Task, onDelete: (id: string) => void): HTMLElement => {
-  const card = DOM.create('div', `task-card priority-${task.priority} status-${task.status}`);
+/** Show a modal overlay with the given content. Returns a function to close it. */
+function showModal(content: HTMLElement): () => void {
+  const overlay = DOM.create('div', 'modal-overlay');
+  const box = DOM.create('div', 'modal-box');
+  const closeBtn = DOM.create('button', 'modal-close btn btn-secondary', '✕');
+  (closeBtn as HTMLButtonElement).type = 'button';
+  const close = (): void => overlay.remove();
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  DOM.append(box, closeBtn, content);
+  DOM.append(overlay, box);
+  document.body.appendChild(overlay);
+  return close;
+}
+
+export const TaskCard = (task: Task, depth = 0): HTMLElement => {
+  const card = DOM.create('div', `task-card status-${task.status}${depth > 0 ? ' task-card-subtask' : ''}`);
   card.dataset.id = task.id;
 
   const header = DOM.create('div', 'task-card-header');
   const title = DOM.create('h3', 'task-title', task.title);
-
-  const priorityBadge = DOM.create('span', `badge badge-priority badge-${task.priority}`, PRIORITY_LABELS[task.priority]);
-
-  DOM.append(header, title, priorityBadge);
+  DOM.append(header, title);
 
   const body = DOM.create('div', 'task-card-body');
 
@@ -50,27 +56,18 @@ export const TaskCard = (task: Task, onDelete: (id: string) => void): HTMLElemen
     DOM.append(meta, due);
   }
 
-  // Priority score badge
-  if (task.taskValue && task.targetDelivery && task.remainingEstimate) {
-    const groups = useGroupStore.getState().groups;
-    const group = groups.find((g) => g.id === task.groupId);
-    const k = group?.priorityCoefficient ?? 1.0;
-    const score = computePriorityScore(task, k);
-    if (score !== null) {
-      const currency =
-        task.taskValue.type === 'direct'
-          ? task.taskValue.amount.currency
-          : task.taskValue.unitCost.currency;
-      const value = computeTaskValue(task.taskValue);
-      const scoreEl = DOM.create('span', 'badge badge-score', `⚡ ${formatMoney(score, currency)}`);
-      scoreEl.title =
-        `Priority score: ${formatMoney(score, currency)}` +
-        ` (value: ${formatMoney(value, currency)}` +
-        (group ? `, k=${k}` : '') +
-        ')';
-      DOM.append(meta, scoreEl);
-    }
-  }
+  // Priority score badge (always shown since score fields are required)
+  const currency =
+    task.taskValue.type === 'direct'
+      ? task.taskValue.amount.currency
+      : task.taskValue.unitCost.currency;
+  const score = computePriorityScore(task);
+  const value = computeTaskValue(task.taskValue);
+  const scoreEl = DOM.create('span', 'badge badge-score', `⚡ ${formatMoney(score, currency)}`);
+  scoreEl.title =
+    `Priority score: ${formatMoney(score, currency)}` +
+    ` (value: ${formatMoney(value, currency)})`;
+  DOM.append(meta, scoreEl);
 
   if (task.tags && task.tags.length > 0) {
     const tagsContainer = DOM.create('div', 'task-tags');
@@ -90,13 +87,49 @@ export const TaskCard = (task: Task, onDelete: (id: string) => void): HTMLElemen
     useTaskStore.getState().updateTask(task.id, { status: STATUS_NEXT[task.status] });
   });
 
-  const deleteBtn = DOM.create('button', 'btn btn-danger', 'Delete');
-  deleteBtn.addEventListener('click', () => {
-    onDelete(task.id);
+  const editBtn = DOM.create('button', 'btn btn-secondary', '✏ Edit');
+  editBtn.addEventListener('click', () => {
+    const editForm = TaskForm(
+      (updated) => {
+        useTaskStore.getState().updateTask(task.id, updated);
+        close();
+      },
+      task,
+      'Save Changes',
+    );
+    const close = showModal(editForm);
   });
 
-  DOM.append(footer, progressBtn, deleteBtn);
+  const addSubBtn = DOM.create('button', 'btn btn-secondary', '+ Sub-task');
+  addSubBtn.addEventListener('click', () => {
+    const subForm = TaskForm(
+      (subTaskData) => {
+        useTaskStore.getState().addTask({ ...subTaskData, parentId: task.id });
+        close();
+      },
+      undefined,
+      'Add Sub-task',
+    );
+    const close = showModal(subForm);
+  });
+
+  const deleteBtn = DOM.create('button', 'btn btn-danger', 'Delete');
+  deleteBtn.addEventListener('click', () => {
+    useTaskStore.getState().deleteTask(task.id);
+  });
+
+  DOM.append(footer, progressBtn, editBtn, addSubBtn, deleteBtn);
   DOM.append(card, header, body, footer);
+
+  // Render sub-tasks recursively
+  const subTasks = useTaskStore.getState().getSubTasks(task.id);
+  if (subTasks.length > 0) {
+    const subList = DOM.create('div', 'task-subtask-list');
+    subTasks.forEach((sub) => {
+      DOM.append(subList, TaskCard(sub, depth + 1));
+    });
+    DOM.append(card, subList);
+  }
 
   return card;
 };

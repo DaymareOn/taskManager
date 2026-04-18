@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { Task, TaskFilter } from '../types/Task';
 import { StorageManager } from '../utils/storage';
 import { computePriorityScore } from '../utils/priority';
-import { useGroupStore } from './groupStore';
 
 export interface TaskStore {
   tasks: Task[];
@@ -17,6 +16,7 @@ export interface TaskStore {
   
   // Getters
   getFilteredTasks: () => Task[];
+  getSubTasks: (parentId: string) => Task[];
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
@@ -52,7 +52,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   deleteTask: (id: string) => {
     set((state) => {
-      const updated = state.tasks.filter((task) => task.id !== id);
+      // Also delete all sub-tasks recursively
+      const toDelete = new Set<string>();
+      const collect = (taskId: string): void => {
+        toDelete.add(taskId);
+        state.tasks.filter((t) => t.parentId === taskId).forEach((t) => collect(t.id));
+      };
+      collect(id);
+      const updated = state.tasks.filter((task) => !toDelete.has(task.id));
       StorageManager.saveTasks(updated);
       return { tasks: updated };
     });
@@ -71,10 +78,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const { tasks, filter } = get();
     const now = Date.now();
 
+    // Only return root tasks (no parentId) at the top level
     let result = tasks.filter((task) => {
+      if (task.parentId) return false;
       if (filter.status && task.status !== filter.status) return false;
-      if (filter.priority && task.priority !== filter.priority) return false;
-      if (filter.groupId && task.groupId !== filter.groupId) return false;
       if (
         filter.search &&
         !task.title.toLowerCase().includes(filter.search.toLowerCase()) &&
@@ -86,16 +93,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     });
 
     if (filter.sortByScore) {
-      const groups = useGroupStore.getState().groups;
       result = [...result].sort((a, b) => {
-        const kA = groups.find((g) => g.id === a.groupId)?.priorityCoefficient ?? 1.0;
-        const kB = groups.find((g) => g.id === b.groupId)?.priorityCoefficient ?? 1.0;
-        const scoreA = computePriorityScore(a, kA, now) ?? -Infinity;
-        const scoreB = computePriorityScore(b, kB, now) ?? -Infinity;
+        const scoreA = computePriorityScore(a, 1.0, now);
+        const scoreB = computePriorityScore(b, 1.0, now);
         return scoreB - scoreA;
       });
     }
 
     return result;
+  },
+
+  getSubTasks: (parentId: string) => {
+    return get().tasks.filter((task) => task.parentId === parentId);
   },
 }));
