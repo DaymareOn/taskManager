@@ -38,8 +38,15 @@ You can:
  HOW TO START THE APP (ONE CLICK)
 ----------------------------------------------------
 
-1. Download or copy the whole "vibeCodedTaskManager"
-   folder to your computer (e.g. Desktop or Documents).
+1. Go to the Releases page on GitHub:
+
+       https://github.com/DaymareOn/vibeCodedTaskManager/releases
+
+   Download the latest zip file
+   (e.g. vibeCodedTaskManager-v1.0.0.zip).
+   Extract it — you will get a "vibeCodedTaskManager"
+   folder. Move that folder somewhere convenient
+   (e.g. Desktop or Documents).
 
 2. Open the folder.
 
@@ -139,8 +146,10 @@ A: Make sure you have an internet connection and
    try double-clicking start.bat again.
 
 Q: How do I update the app?
-A: Download the latest version, replace the folder,
-   and double-click start.bat again.
+A: Go to the Releases page, download the latest zip,
+   extract it to replace the old folder, and
+   double-click start.bat again.
+   https://github.com/DaymareOn/vibeCodedTaskManager/releases
 
 
 ----------------------------------------------------
