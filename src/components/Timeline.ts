@@ -106,8 +106,8 @@ export const Timeline = (): HTMLElement => {
       }
       return true;
     });
-    // Return tasks in creation order (most recent last)
-    return [...tasks].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    // Sort by priority score descending (highest score first)
+    return [...tasks].sort((a, b) => computePriorityScore(b, 1.0, Date.now()) - computePriorityScore(a, 1.0, Date.now()));
   }
 
   // -------- Render ruler --------
