@@ -16,12 +16,8 @@ export const TaskList = (container: HTMLElement): void => {
       return;
     }
 
-    const onDelete = (id: string): void => {
-      useTaskStore.getState().deleteTask(id);
-    };
-
     tasks.forEach((task) => {
-      const card = TaskCard(task, onDelete);
+      const card = TaskCard(task);
       DOM.append(container, card);
     });
   };

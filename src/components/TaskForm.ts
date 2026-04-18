@@ -1,86 +1,73 @@
 import type { Task, Duration, TaskValue } from '../types/Task';
 import { DOM } from '../utils/dom';
-import { useGroupStore } from '../store/groupStore';
 
-export const TaskForm = (onSubmit: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void): HTMLElement => {
+type TaskFormData = Omit<Task, 'id' | 'createdAt' | 'updatedAt'>;
+
+/**
+ * Build a task form element.
+ * @param onSubmit  Called with the form data when the user submits.
+ * @param existingTask  When provided, the form is pre-filled for editing.
+ * @param submitLabel  Label for the submit button.
+ */
+export const TaskForm = (
+  onSubmit: (task: TaskFormData) => void,
+  existingTask?: Task,
+  submitLabel = 'Add Task',
+): HTMLElement => {
   const form = DOM.create('form', 'task-form') as HTMLFormElement;
 
   const titleInput = DOM.create('input', 'form-input') as HTMLInputElement;
   titleInput.type = 'text';
   titleInput.placeholder = 'Task title';
   titleInput.required = true;
+  if (existingTask) titleInput.value = existingTask.title;
 
   const descriptionInput = DOM.create('textarea', 'form-input') as HTMLTextAreaElement;
   descriptionInput.placeholder = 'Task description';
   descriptionInput.rows = 3;
+  if (existingTask) descriptionInput.value = existingTask.description;
 
   const dueDateInput = DOM.create('input', 'form-input') as HTMLInputElement;
   dueDateInput.type = 'date';
-
-  const prioritySelect = DOM.create('select', 'form-input') as HTMLSelectElement;
-  prioritySelect.innerHTML = `
-    <option value="medium" selected>Priority: Medium</option>
-    <option value="low">Priority: Low</option>
-    <option value="high">Priority: High</option>
-  `;
+  if (existingTask?.dueDate) dueDateInput.value = existingTask.dueDate;
 
   const tagsInput = DOM.create('input', 'form-input') as HTMLInputElement;
   tagsInput.type = 'text';
   tagsInput.placeholder = 'Tags (comma-separated)';
+  if (existingTask) tagsInput.value = existingTask.tags.join(', ');
 
-  // --- Advanced: Priority Score section ---
-  const advancedSection = DOM.create('div', 'form-advanced');
-
-  const advancedToggle = DOM.create('button', 'btn btn-secondary form-advanced-toggle', '⚡ Priority Score (optional) ▼');
-  (advancedToggle as HTMLButtonElement).type = 'button';
-  const advancedContent = DOM.create('div', 'form-advanced-content');
-
-  advancedToggle.addEventListener('click', () => {
-    const hidden = advancedContent.classList.toggle('hidden');
-    advancedToggle.textContent = hidden
-      ? '⚡ Priority Score (optional) ▼'
-      : '⚡ Priority Score (optional) ▲';
-  });
-  advancedContent.classList.add('hidden');
-
-  // Group selector
-  const groupLabel = DOM.create('label', 'form-label', 'Group');
-  const groupSelect = DOM.create('select', 'form-input') as HTMLSelectElement;
-  const refreshGroupOptions = (): void => {
-    const { groups } = useGroupStore.getState();
-    groupSelect.innerHTML = '<option value="">— No group —</option>';
-    groups.forEach((g) => {
-      const opt = document.createElement('option');
-      opt.value = g.id;
-      opt.textContent = `${g.name} (k = ${g.priorityCoefficient})`;
-      groupSelect.appendChild(opt);
-    });
-  };
-  useGroupStore.subscribe(refreshGroupOptions);
-  refreshGroupOptions();
+  // --- Priority Score section (required) ---
+  const scoreSection = DOM.create('div', 'form-score-section');
+  const scoreSectionTitle = DOM.create('div', 'form-score-title', '⚡ Priority Score');
 
   // Value type
   const valueTypeLabel = DOM.create('label', 'form-label', 'Value type');
   const valueTypeSelect = DOM.create('select', 'form-input') as HTMLSelectElement;
   valueTypeSelect.innerHTML = `
-    <option value="none">— No value —</option>
     <option value="direct">Direct amount</option>
     <option value="event">Event (unit cost × probability)</option>
   `;
+  if (existingTask?.taskValue?.type === 'event') valueTypeSelect.value = 'event';
 
   // Direct value fields
-  const directSection = DOM.create('div', 'form-row hidden');
+  const directSection = DOM.create('div', 'form-row');
   const directAmount = DOM.create('input', 'form-input') as HTMLInputElement;
   directAmount.type = 'number';
   directAmount.min = '0';
   directAmount.step = '0.01';
   directAmount.placeholder = 'Amount (e.g. 1500)';
+  directAmount.required = true;
   const directCurrency = DOM.create('input', 'form-input') as HTMLInputElement;
   directCurrency.type = 'text';
   directCurrency.placeholder = 'Currency (e.g. EUR)';
   directCurrency.value = 'EUR';
   directCurrency.maxLength = 3;
   DOM.append(directSection, directAmount, directCurrency);
+
+  if (existingTask?.taskValue?.type === 'direct') {
+    directAmount.value = String(existingTask.taskValue.amount.amount);
+    directCurrency.value = existingTask.taskValue.amount.currency;
+  }
 
   // Event value fields
   const eventSection = DOM.create('div', 'form-row hidden');
@@ -102,69 +89,93 @@ export const TaskForm = (onSubmit: (task: Omit<Task, 'id' | 'createdAt' | 'updat
   probabilityInput.placeholder = 'Probability (0 to 1, e.g. 0.05)';
   const eventPeriodInput = DOM.create('input', 'form-input') as HTMLInputElement;
   eventPeriodInput.type = 'text';
-  eventPeriodInput.placeholder = 'Period ISO 8601 (e.g. P1Y, P3M, P30D) — required';
+  eventPeriodInput.placeholder = 'Period ISO 8601 (e.g. P1Y, P3M, P30D)';
   DOM.append(eventSection, unitCostAmount, unitCostCurrency, probabilityInput, eventPeriodInput);
 
-  valueTypeSelect.addEventListener('change', () => {
+  if (existingTask?.taskValue?.type === 'event') {
+    unitCostAmount.value = String(existingTask.taskValue.unitCost.amount);
+    unitCostCurrency.value = existingTask.taskValue.unitCost.currency;
+    probabilityInput.value = String(existingTask.taskValue.probability);
+    eventPeriodInput.value = existingTask.taskValue.period.iso;
+  }
+
+  const showValueFields = (): void => {
     directSection.classList.toggle('hidden', valueTypeSelect.value !== 'direct');
     eventSection.classList.toggle('hidden', valueTypeSelect.value !== 'event');
-  });
+    directAmount.required = valueTypeSelect.value === 'direct';
+    unitCostAmount.required = valueTypeSelect.value === 'event';
+    probabilityInput.required = valueTypeSelect.value === 'event';
+    eventPeriodInput.required = valueTypeSelect.value === 'event';
+  };
+  valueTypeSelect.addEventListener('change', showValueFields);
+  showValueFields();
 
   // Target delivery
   const deliveryLabel = DOM.create('label', 'form-label', 'Target delivery');
   const deliveryTypeSelect = DOM.create('select', 'form-input') as HTMLSelectElement;
   deliveryTypeSelect.innerHTML = `
-    <option value="none">— No target delivery —</option>
     <option value="date">Fixed date</option>
     <option value="duration">Relative duration from now</option>
   `;
-  const deliveryDateInput = DOM.create('input', 'form-input hidden') as HTMLInputElement;
+  const deliveryDateInput = DOM.create('input', 'form-input') as HTMLInputElement;
   deliveryDateInput.type = 'date';
+  deliveryDateInput.required = true;
   const deliveryDurationInput = DOM.create('input', 'form-input hidden') as HTMLInputElement;
   deliveryDurationInput.type = 'text';
   deliveryDurationInput.placeholder = 'ISO 8601 duration (e.g. P3M, P2W, P10D, PT6H)';
 
-  deliveryTypeSelect.addEventListener('change', () => {
-    deliveryDateInput.classList.toggle('hidden', deliveryTypeSelect.value !== 'date');
-    deliveryDurationInput.classList.toggle('hidden', deliveryTypeSelect.value !== 'duration');
-  });
+  if (existingTask?.targetDelivery) {
+    if (typeof existingTask.targetDelivery === 'string') {
+      deliveryTypeSelect.value = 'date';
+      deliveryDateInput.value = existingTask.targetDelivery;
+    } else {
+      deliveryTypeSelect.value = 'duration';
+      deliveryDurationInput.value = existingTask.targetDelivery.iso;
+    }
+  }
+
+  const showDeliveryFields = (): void => {
+    const isDate = deliveryTypeSelect.value === 'date';
+    deliveryDateInput.classList.toggle('hidden', !isDate);
+    deliveryDurationInput.classList.toggle('hidden', isDate);
+    deliveryDateInput.required = isDate;
+    deliveryDurationInput.required = !isDate;
+  };
+  deliveryTypeSelect.addEventListener('change', showDeliveryFields);
+  showDeliveryFields();
 
   // Remaining estimate
   const estimateLabel = DOM.create('label', 'form-label', 'Remaining estimate');
   const estimateInput = DOM.create('input', 'form-input') as HTMLInputElement;
   estimateInput.type = 'text';
   estimateInput.placeholder = 'ISO 8601 duration (e.g. P5D, PT4H, P1W)';
+  estimateInput.required = true;
+  if (existingTask?.remainingEstimate) estimateInput.value = existingTask.remainingEstimate.iso;
 
   DOM.append(
-    advancedContent,
-    groupLabel, groupSelect,
+    scoreSection,
+    scoreSectionTitle,
     valueTypeLabel, valueTypeSelect,
     directSection,
     eventSection,
     deliveryLabel, deliveryTypeSelect, deliveryDateInput, deliveryDurationInput,
     estimateLabel, estimateInput,
   );
-  DOM.append(advancedSection, advancedToggle, advancedContent);
 
-  const submitBtn = DOM.create('button', 'btn-primary', 'Add Task');
+  const submitBtn = DOM.create('button', 'btn-primary', submitLabel);
   (submitBtn as HTMLButtonElement).type = 'submit';
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
     // Build taskValue
-    let taskValue: TaskValue | undefined;
-    if (valueTypeSelect.value === 'direct' && directAmount.value) {
+    let taskValue: TaskValue;
+    if (valueTypeSelect.value === 'direct') {
       taskValue = {
         type: 'direct',
         amount: { amount: parseFloat(directAmount.value), currency: directCurrency.value.toUpperCase() || 'EUR' },
       };
-    } else if (
-      valueTypeSelect.value === 'event' &&
-      unitCostAmount.value &&
-      probabilityInput.value &&
-      eventPeriodInput.value
-    ) {
+    } else {
       taskValue = {
         type: 'event',
         unitCost: {
@@ -177,42 +188,40 @@ export const TaskForm = (onSubmit: (task: Omit<Task, 'id' | 'createdAt' | 'updat
     }
 
     // Build targetDelivery
-    let targetDelivery: string | Duration | undefined;
-    if (deliveryTypeSelect.value === 'date' && deliveryDateInput.value) {
+    let targetDelivery: string | Duration;
+    if (deliveryTypeSelect.value === 'date') {
       targetDelivery = deliveryDateInput.value;
-    } else if (deliveryTypeSelect.value === 'duration' && deliveryDurationInput.value) {
+    } else {
       targetDelivery = { iso: deliveryDurationInput.value };
     }
 
-    // Build remainingEstimate
-    const remainingEstimate: Duration | undefined = estimateInput.value
-      ? { iso: estimateInput.value }
-      : undefined;
+    const remainingEstimate: Duration = { iso: estimateInput.value };
 
-    const groupId = groupSelect.value || undefined;
-
-    const newTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
+    const taskData: TaskFormData = {
       title: titleInput.value,
       description: descriptionInput.value,
-      status: 'todo',
-      priority: prioritySelect.value as Task['priority'],
+      status: existingTask?.status ?? 'todo',
       dueDate: dueDateInput.value || undefined,
       tags: tagsInput.value.split(',').map((tag) => tag.trim()).filter(Boolean),
       taskValue,
       targetDelivery,
       remainingEstimate,
-      groupId,
+      parentId: existingTask?.parentId,
     };
 
-    onSubmit(newTask);
-    form.reset();
-    // Reset dynamic field visibility
-    directSection.classList.add('hidden');
-    eventSection.classList.add('hidden');
-    deliveryDateInput.classList.add('hidden');
-    deliveryDurationInput.classList.add('hidden');
+    onSubmit(taskData);
+    if (!existingTask) {
+      form.reset();
+      // Restore defaults after reset
+      directCurrency.value = 'EUR';
+      unitCostCurrency.value = 'EUR';
+      valueTypeSelect.value = 'direct';
+      deliveryTypeSelect.value = 'date';
+      showValueFields();
+      showDeliveryFields();
+    }
   });
 
-  DOM.append(form, titleInput, descriptionInput, dueDateInput, prioritySelect, tagsInput, advancedSection, submitBtn);
+  DOM.append(form, titleInput, descriptionInput, dueDateInput, tagsInput, scoreSection, submitBtn);
   return form;
 };

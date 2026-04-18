@@ -1,11 +1,9 @@
 // Entry point for the Vibe Coded Task Manager
 import './styles/main.css';
 import { useTaskStore } from './store/taskStore';
-import { useGroupStore } from './store/groupStore';
 import { TaskForm } from './components/TaskForm';
 import { TaskList } from './components/TaskList';
 import { FilterBar } from './components/FilterBar';
-import { GroupPanel } from './components/GroupPanel';
 import { DOM } from './utils/dom';
 
 const app = DOM.getElementById('app');
@@ -14,10 +12,6 @@ const app = DOM.getElementById('app');
 const header = DOM.create('header', 'app-header');
 header.innerHTML = `<h1>📋 Vibe Coded Task Manager</h1><p>Manage your tasks simply and efficiently</p>`;
 DOM.append(app, header);
-
-// Group panel
-const groupPanel = GroupPanel();
-DOM.append(app, groupPanel);
 
 // Task form
 const store = useTaskStore.getState();
@@ -52,6 +46,5 @@ DOM.append(app, taskListContainer);
 TaskList(taskListContainer);
 
 // Load persisted data
-useGroupStore.getState().loadGroups();
 useTaskStore.getState().loadTasks();
 updateStats();
