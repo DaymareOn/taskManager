@@ -12,6 +12,37 @@
  *     2. After import the tasks are visible in the Timeline.
  *     3. Exporting produces a JSON file whose content is
  *        structurally identical to the original sampleTasks.json.
+ *
+ * Test suite 3 – Add a new task via the Timeline
+ *   Verifies that clicking an empty area in the Timeline opens the
+ *   add-task form and that submitting it makes the task visible.
+ *
+ * Test suite 4 – Edit a task via the Timeline modal
+ *   Verifies that clicking a task rect opens the edit form pre-filled
+ *   and that saving changes updates the task in the Timeline.
+ *
+ * Test suite 5 – Delete a task via the Timeline modal
+ *   Verifies that deleting a task from the edit modal removes it from
+ *   the Timeline.
+ *
+ * Test suite 6 – Add a sub-task via the Timeline modal
+ *   Verifies that adding a sub-task through the "+ Add Sub-task" button
+ *   causes it to appear in the hover layer when the parent is hovered.
+ *
+ * Test suite 7 – Filter bar
+ *   Verifies the search filter, status filter, and "Clear Filters"
+ *   button all work correctly in the Timeline.
+ *
+ * Test suite 8 – Theme switching
+ *   Verifies that clicking each theme button applies the correct CSS
+ *   class to the root <html> element.
+ *
+ * Test suite 9 – Show / hide cancelled tasks
+ *   Verifies that the "Show Cancelled" checkbox correctly shows or hides
+ *   cancelled tasks in the Timeline.
+ *
+ * Test suite 10 – Tools panel collapse / expand
+ *   Verifies that the toggle button collapses and expands the tools panel.
  */
 
 import { test, expect } from '@playwright/test';
@@ -27,6 +58,18 @@ const SAMPLE_TASKS_JSON = path.resolve(__dirname, '../src/data/sampleTasks.json'
 /** Clear localStorage so each test starts from a clean state. */
 async function clearStorage(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(() => localStorage.clear());
+  await page.reload();
+}
+
+/**
+ * Navigate to an empty-task state without triggering the sample-data seed.
+ * Sets the "seeded" flag so loadTasks() returns [] on the next reload.
+ */
+async function clearTasksOnly(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(() => {
+    localStorage.setItem('tasks_seeded', 'true');
+    localStorage.removeItem('tasks_data');
+  });
   await page.reload();
 }
 
@@ -183,3 +226,353 @@ test.describe('Import / Export round-trip', () => {
     expect(exported).toEqual(original);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Suite 3 – Add a new task via the Timeline
+// ---------------------------------------------------------------------------
+
+test.describe('Add a new task via the Timeline', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearTasksOnly(page);
+    // Wait for the app shell (no task rects when the list is empty)
+    await page.waitForSelector('.tools-column', { timeout: 10_000 });
+  });
+
+  test('clicking empty timeline area opens the add-task form modal', async ({ page }) => {
+    await page.locator('.timeline-body').click({ position: { x: 100, y: 100 } });
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.task-form')).toBeVisible();
+  });
+
+  test('can add a new task and see it in the Timeline', async ({ page }) => {
+    // Open the add-task modal by clicking an empty area in the timeline
+    await page.locator('.timeline-body').click({ position: { x: 100, y: 100 } });
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+
+    // Fill in required fields
+    await page.fill('input[placeholder="Task title"]', 'Brand new task');
+    await page.fill('input[placeholder="Amount (e.g. 1500)"]', '1000');
+
+    // Set a target delivery date 30 days from now
+    const deliveryDate = new Date();
+    deliveryDate.setDate(deliveryDate.getDate() + 30);
+    await page
+      .locator('.form-score-section input[type="date"]')
+      .fill(deliveryDate.toISOString().slice(0, 10));
+
+    await page.fill('input[placeholder="ISO 8601 duration (e.g. P5D, PT4H, P1W)"]', 'P2D');
+
+    await page.click('button[type="submit"]');
+
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Brand new task' }).first(),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 4 – Edit a task via the Timeline modal
+// ---------------------------------------------------------------------------
+
+test.describe('Edit a task via the Timeline modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+  });
+
+  test('clicking a task rect opens the edit modal pre-filled with the task title', async ({
+    page,
+  }) => {
+    await page
+      .locator('.task-rect', {
+        has: page.locator('.task-title', { hasText: 'File income tax return' }),
+      })
+      .first()
+      .click();
+
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('input[placeholder="Task title"]')).toHaveValue(
+      'File income tax return',
+    );
+  });
+
+  test('can update a task title and see the change reflected in the Timeline', async ({ page }) => {
+    await page
+      .locator('.task-rect', {
+        has: page.locator('.task-title', { hasText: 'Renew driving licence' }),
+      })
+      .first()
+      .click();
+
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+
+    await page.locator('input[placeholder="Task title"]').fill('Driving licence renewed');
+    await page.click('button[type="submit"]');
+
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Driving licence renewed' }).first(),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 5 – Delete a task via the Timeline modal
+// ---------------------------------------------------------------------------
+
+test.describe('Delete a task via the Timeline modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+  });
+
+  test('can delete a task and it disappears from the Timeline', async ({ page }) => {
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Book annual dentist check-up' }).first(),
+    ).toBeVisible();
+
+    await page
+      .locator('.task-rect', {
+        has: page.locator('.task-title', { hasText: 'Book annual dentist check-up' }),
+      })
+      .first()
+      .click();
+
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+
+    // Accept the confirmation dialog that appears before deletion
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.click('button:has-text("Delete Task")');
+
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Book annual dentist check-up' }),
+    ).toHaveCount(0, { timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 6 – Add a sub-task via the Timeline modal
+// ---------------------------------------------------------------------------
+
+test.describe('Add a sub-task via the Timeline modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+  });
+
+  test('can add a sub-task and see it in the hover layer', async ({ page }) => {
+    // Open the edit modal for a task that currently has no sub-tasks
+    await page
+      .locator('.task-rect', {
+        has: page.locator('.task-title', { hasText: 'Fix leaky bathroom faucet' }),
+      })
+      .first()
+      .click();
+
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+
+    // The "+ Add Sub-task" button closes the current modal and opens a sub-task form
+    await page.click('button:has-text("Add Sub-task")');
+    await expect(page.locator('.task-form')).toBeVisible({ timeout: 5_000 });
+
+    // Fill in the sub-task details
+    await page.fill('input[placeholder="Task title"]', 'Replace the faucet washer');
+    await page.fill('input[placeholder="Amount (e.g. 1500)"]', '25');
+
+    const deliveryDate = new Date();
+    deliveryDate.setDate(deliveryDate.getDate() + 14);
+    await page
+      .locator('.form-score-section input[type="date"]')
+      .fill(deliveryDate.toISOString().slice(0, 10));
+
+    await page.fill('input[placeholder="ISO 8601 duration (e.g. P5D, PT4H, P1W)"]', 'PT2H');
+
+    await page.click('button[type="submit"]');
+
+    // Wait for the sub-task modal to close, then hover the parent to reveal its sub-tasks
+    await expect(page.locator('.modal-overlay')).toHaveCount(0, { timeout: 5_000 });
+
+    await page
+      .locator('.task-rect', {
+        has: page.locator('.task-title', { hasText: 'Fix leaky bathroom faucet' }),
+      })
+      .first()
+      .hover();
+
+    await expect(
+      page.locator('.timeline-hover-layer .task-title', {
+        hasText: 'Replace the faucet washer',
+      }),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 7 – Filter bar (search, status filter, clear)
+// ---------------------------------------------------------------------------
+
+test.describe('Filter bar', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+  });
+
+  test('search filter shows only tasks whose title or description matches', async ({ page }) => {
+    await page.fill('input[placeholder="🔍 Search tasks…"]', 'dentist');
+
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Book annual dentist check-up' }).first(),
+    ).toBeVisible({ timeout: 3_000 });
+
+    // A non-matching task should not be visible
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'File income tax return' }),
+    ).toHaveCount(0);
+  });
+
+  test('status filter shows only tasks with the selected status', async ({ page }) => {
+    await page.selectOption('select.filter-select', 'in-progress');
+
+    // An in-progress task should be visible
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Car annual service and MOT' }).first(),
+    ).toBeVisible({ timeout: 3_000 });
+
+    // A "todo" task should not be visible
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'File income tax return' }),
+    ).toHaveCount(0);
+  });
+
+  test('Clear Filters button restores all tasks after a search', async ({ page }) => {
+    // "electricity" matches only "Pay quarterly electricity bill"
+    await page.fill('input[placeholder="🔍 Search tasks…"]', 'electricity');
+    await expect(page.locator('.task-rect')).toHaveCount(1, { timeout: 3_000 });
+
+    await page.click('button:has-text("Clear Filters")');
+
+    // All 13 root-level tasks should be visible again
+    await expect(page.locator('.task-rect')).toHaveCount(13, { timeout: 3_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 8 – Theme switching
+// ---------------------------------------------------------------------------
+
+test.describe('Theme switching', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('switches to Light Pro theme', async ({ page }) => {
+    await page.click('button[data-theme="light-pro"]');
+    await expect(page.locator('html')).toHaveClass(/theme-light-pro/);
+  });
+
+  test('switches to Pastel theme', async ({ page }) => {
+    await page.click('button[data-theme="pastel"]');
+    await expect(page.locator('html')).toHaveClass(/theme-pastel/);
+  });
+
+  test('switches back to Dark Pro theme from another theme', async ({ page }) => {
+    await page.click('button[data-theme="light-pro"]');
+    await page.click('button[data-theme="dark-pro"]');
+    await expect(page.locator('html')).toHaveClass(/theme-dark-pro/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 9 – Show / hide cancelled tasks
+// ---------------------------------------------------------------------------
+
+test.describe('Show / hide cancelled tasks', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    // Inject one active and one cancelled task directly into localStorage
+    await page.evaluate(() => {
+      const tasks = [
+        {
+          id: 'test-active-1',
+          title: 'Active Task',
+          description: '',
+          status: 'todo',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          tags: [],
+          taskValue: { type: 'direct', amount: { amount: 100, currency: 'EUR' } },
+          targetDelivery: '2026-12-31',
+          remainingEstimate: { iso: 'P1D' },
+        },
+        {
+          id: 'test-cancelled-1',
+          title: 'Cancelled Task',
+          description: '',
+          status: 'cancelled',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          tags: [],
+          taskValue: { type: 'direct', amount: { amount: 100, currency: 'EUR' } },
+          targetDelivery: '2026-12-31',
+          remainingEstimate: { iso: 'P1D' },
+        },
+      ];
+      localStorage.setItem('tasks_data', JSON.stringify(tasks));
+      localStorage.setItem('tasks_seeded', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+  });
+
+  test('both active and cancelled tasks are shown by default', async ({ page }) => {
+    await expect(page.locator('.task-rect')).toHaveCount(2);
+  });
+
+  test('unchecking "Show Cancelled" hides cancelled tasks from the Timeline', async ({ page }) => {
+    await page.uncheck('.tools-checkbox');
+
+    await expect(page.locator('.task-rect')).toHaveCount(1, { timeout: 3_000 });
+    await expect(
+      page.locator('.task-rect .task-title', { hasText: 'Active Task' }).first(),
+    ).toBeVisible();
+  });
+
+  test('re-checking "Show Cancelled" brings cancelled tasks back', async ({ page }) => {
+    await page.uncheck('.tools-checkbox');
+    await expect(page.locator('.task-rect')).toHaveCount(1, { timeout: 3_000 });
+
+    await page.check('.tools-checkbox');
+    await expect(page.locator('.task-rect')).toHaveCount(2, { timeout: 3_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 10 – Tools panel collapse / expand
+// ---------------------------------------------------------------------------
+
+test.describe('Tools panel collapse / expand', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('clicking the toggle button collapses the tools panel', async ({ page }) => {
+    await expect(page.locator('.tools-column')).not.toHaveClass(/collapsed/);
+
+    await page.click('.tools-toggle-btn');
+
+    await expect(page.locator('.tools-column')).toHaveClass(/collapsed/);
+  });
+
+  test('clicking the toggle button again expands the tools panel', async ({ page }) => {
+    await page.click('.tools-toggle-btn');
+    await expect(page.locator('.tools-column')).toHaveClass(/collapsed/);
+
+    await page.click('.tools-toggle-btn');
+    await expect(page.locator('.tools-column')).not.toHaveClass(/collapsed/);
+  });
+});
+
