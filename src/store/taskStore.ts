@@ -21,7 +21,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   filter: {},
 
-  addTask: (taskData) => {
+  addTask: (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newTask: Task = {
       ...taskData,
       id: crypto.randomUUID(),
@@ -36,7 +36,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     });
   },
 
-  updateTask: (id, updates) => {
+  updateTask: (id: string, updates: Partial<Task>) => {
     set((state) => {
       const updated = state.tasks.map((task) =>
         task.id === id
@@ -48,7 +48,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     });
   },
 
-  deleteTask: (id) => {
+  deleteTask: (id: string) => {
     set((state) => {
       const updated = state.tasks.filter((task) => task.id !== id);
       StorageManager.saveTasks(updated);
@@ -56,7 +56,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     });
   },
 
-  setFilter: (filter) => {
+  setFilter: (filter: TaskFilter) => {
     set({ filter });
   },
 

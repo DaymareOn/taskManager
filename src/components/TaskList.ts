@@ -1,7 +1,7 @@
 import type { Task } from '../types/Task';
 import { DOM } from '../utils/dom';
 import { TaskCard } from './TaskCard';
-import { useTaskStore } from '../store/taskStore';
+import { useTaskStore, type TaskStore } from '../store/taskStore';
 
 export const TaskList = (container: HTMLElement): void => {
   const render = (tasks: Task[]): void => {
@@ -27,7 +27,7 @@ export const TaskList = (container: HTMLElement): void => {
   };
 
   // Subscribe to store changes
-  useTaskStore.subscribe((state) => {
+  useTaskStore.subscribe((state: TaskStore) => {
     render(state.getFilteredTasks());
   });
 
