@@ -4,17 +4,17 @@ import type { Task } from '../types/Task';
 const SEED_DATE = new Date('2026-01-01T00:00:00Z');
 
 // Helper function to compute dates relative to SEED_DATE
-const offsetDate = (baseDate: Date, days: number): string => {
-  const result = new Date(baseDate);
-  result.setDate(result.getDate() + days);
+const offsetDate = (baseDate: Date, days: number, hours: number = 0, minutes: number = 0): string => {
+  const milliseconds = days * 24 * 60 * 60 * 1000 + hours * 60 * 60 * 1000 + minutes * 60 * 1000;
+  const result = new Date(baseDate.getTime() + milliseconds);
   return result.toISOString();
 };
 
 // Helper to format date as YYYY-MM-DD
 const offsetDateOnly = (baseDate: Date, days: number): string => {
-  const result = new Date(baseDate);
-  result.setDate(result.getDate() + days);
-  return result.toISOString().split('T')[0];
+  const milliseconds = days * 24 * 60 * 60 * 1000;
+  const result = new Date(baseDate.getTime() + milliseconds);
+  return result.toISOString().slice(0, 10);
 };
 
 // Sample tasks for testing and as examples for new users
@@ -28,8 +28,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 90), // 2026-04-01
     tags: ['finance', 'admin', 'annual'],
-    createdAt: offsetDate(SEED_DATE, 9), // 2026-01-10T09:00:00.000Z (9 days + 9 hours)
-    updatedAt: offsetDate(SEED_DATE, 9),
+    createdAt: offsetDate(SEED_DATE, 9, 9, 0), // 2026-01-10T09:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 9, 9, 0),
   },
   {
     id: '00000000-0000-0000-0000-000000000002',
@@ -40,8 +40,8 @@ export const sampleTasks: Task[] = [
     priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 134), // 2026-05-15
     tags: ['home', 'maintenance'],
-    createdAt: offsetDate(SEED_DATE, 33), // 2026-02-03T11:30:00.000Z (33 days + 11.5 hours)
-    updatedAt: offsetDate(SEED_DATE, 33),
+    createdAt: offsetDate(SEED_DATE, 33, 11, 30), // 2026-02-03T11:30:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 33, 11, 30),
   },
   {
     id: '00000000-0000-0000-0000-000000000003',
@@ -52,8 +52,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 119), // 2026-04-30
     tags: ['finance', 'admin', 'childcare'],
-    createdAt: offsetDate(SEED_DATE, 59), // 2026-03-01T08:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 90), // 2026-04-01T14:20:00.000Z
+    createdAt: offsetDate(SEED_DATE, 59, 8, 0), // 2026-03-01T08:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 90, 14, 20), // 2026-04-01T14:20:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000004',
@@ -64,8 +64,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 117), // 2026-04-28
     tags: ['finance', 'home', 'insurance'],
-    createdAt: offsetDate(SEED_DATE, 73), // 2026-03-15T10:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 73),
+    createdAt: offsetDate(SEED_DATE, 73, 10, 0), // 2026-03-15T10:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 73, 10, 0),
   },
   {
     id: '00000000-0000-0000-0000-000000000005',
@@ -76,8 +76,8 @@ export const sampleTasks: Task[] = [
     priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 120), // 2026-05-01
     tags: ['health', 'family'],
-    createdAt: offsetDate(SEED_DATE, 78), // 2026-03-20T09:15:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 78),
+    createdAt: offsetDate(SEED_DATE, 78, 9, 15), // 2026-03-20T09:15:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 78, 9, 15),
   },
   {
     id: '00000000-0000-0000-0000-000000000006',
@@ -88,8 +88,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 114), // 2026-04-25
     tags: ['auto', 'maintenance'],
-    createdAt: offsetDate(SEED_DATE, 86), // 2026-03-28T08:45:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 99), // 2026-04-10T16:00:00.000Z
+    createdAt: offsetDate(SEED_DATE, 86, 8, 45), // 2026-03-28T08:45:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 99, 16, 0), // 2026-04-10T16:00:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000007',
@@ -100,8 +100,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 89), // 2026-03-31
     tags: ['finance', 'utilities'],
-    createdAt: offsetDate(SEED_DATE, 59), // 2026-03-01T07:30:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 86), // 2026-03-28T10:10:00.000Z
+    createdAt: offsetDate(SEED_DATE, 59, 7, 30), // 2026-03-01T07:30:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 86, 10, 10), // 2026-03-28T10:10:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000008',
@@ -112,8 +112,8 @@ export const sampleTasks: Task[] = [
     priority: 'medium',
     dueDate: offsetDateOnly(SEED_DATE, 63), // 2026-03-05
     tags: ['family', 'school', 'shopping'],
-    createdAt: offsetDate(SEED_DATE, 50), // 2026-02-20T12:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 62), // 2026-03-04T18:00:00.000Z
+    createdAt: offsetDate(SEED_DATE, 50, 12, 0), // 2026-02-20T12:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 62, 18, 0), // 2026-03-04T18:00:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000009',
@@ -124,8 +124,8 @@ export const sampleTasks: Task[] = [
     priority: 'low',
     dueDate: offsetDateOnly(SEED_DATE, 151), // 2026-06-01
     tags: ['family', 'travel', 'leisure'],
-    createdAt: offsetDate(SEED_DATE, 44), // 2026-02-14T20:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 68), // 2026-03-10T21:30:00.000Z
+    createdAt: offsetDate(SEED_DATE, 44, 20, 0), // 2026-02-14T20:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 68, 21, 30), // 2026-03-10T21:30:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000010',
@@ -135,8 +135,8 @@ export const sampleTasks: Task[] = [
     status: 'todo',
     priority: 'medium',
     tags: ['home', 'repairs'],
-    createdAt: offsetDate(SEED_DATE, 94), // 2026-04-05T17:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 94),
+    createdAt: offsetDate(SEED_DATE, 94, 17, 0), // 2026-04-05T17:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 94, 17, 0),
   },
   {
     id: '00000000-0000-0000-0000-000000000011',
@@ -146,8 +146,8 @@ export const sampleTasks: Task[] = [
     status: 'todo',
     priority: 'low',
     tags: ['home', 'admin', 'insurance'],
-    createdAt: offsetDate(SEED_DATE, 76), // 2026-03-18T14:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 76),
+    createdAt: offsetDate(SEED_DATE, 76, 14, 0), // 2026-03-18T14:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 76, 14, 0),
   },
   {
     id: '00000000-0000-0000-0000-000000000012',
@@ -158,8 +158,8 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 139), // 2026-05-20
     tags: ['admin', 'legal'],
-    createdAt: offsetDate(SEED_DATE, 91), // 2026-04-02T09:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 91),
+    createdAt: offsetDate(SEED_DATE, 91, 9, 0), // 2026-04-02T09:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 91, 9, 0),
   },
   {
     id: '00000000-0000-0000-0000-000000000013',
@@ -169,8 +169,8 @@ export const sampleTasks: Task[] = [
     status: 'in-progress',
     priority: 'medium',
     tags: ['finance', 'savings'],
-    createdAt: offsetDate(SEED_DATE, 0), // 2026-01-01T00:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 45), // 2026-02-15T11:00:00.000Z
+    createdAt: offsetDate(SEED_DATE, 0, 0, 0), // 2026-01-01T00:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 45, 11, 0), // 2026-02-15T11:00:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000014',
@@ -180,8 +180,8 @@ export const sampleTasks: Task[] = [
     status: 'done',
     priority: 'low',
     tags: ['home', 'family', 'charity'],
-    createdAt: offsetDate(SEED_DATE, 31), // 2026-02-01T10:00:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 52), // 2026-02-22T15:45:00.000Z
+    createdAt: offsetDate(SEED_DATE, 31, 10, 0), // 2026-02-01T10:00:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 52, 15, 45), // 2026-02-22T15:45:00.000Z
   },
   {
     id: '00000000-0000-0000-0000-000000000015',
@@ -192,7 +192,7 @@ export const sampleTasks: Task[] = [
     priority: 'high',
     dueDate: offsetDateOnly(SEED_DATE, 181), // 2026-07-01
     tags: ['legal', 'admin', 'finance'],
-    createdAt: offsetDate(SEED_DATE, 83), // 2026-03-25T10:30:00.000Z
-    updatedAt: offsetDate(SEED_DATE, 83),
+    createdAt: offsetDate(SEED_DATE, 83, 10, 30), // 2026-03-25T10:30:00.000Z
+    updatedAt: offsetDate(SEED_DATE, 83, 10, 30),
   },
 ];
