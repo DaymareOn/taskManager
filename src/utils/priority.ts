@@ -81,6 +81,7 @@ export function computePriorityScore(
   priorityCoefficient = 1.0,
   now = Date.now(),
 ): number {
+  if (!task.taskValue || !task.remainingEstimate || !task.targetDelivery) return 0;
   const V = computeTaskValue(task.taskValue);
   const E = parseDuration(task.remainingEstimate.iso);
   if (E <= 0) return V;
@@ -125,6 +126,7 @@ export function computeTaskValueConverted(
   mainCurrency: string,
   rates: Record<string, number>,
 ): number {
+  if (!taskValue) return 0;
   if (taskValue.type === 'direct') {
     return convertToMainCurrency(taskValue.amount.amount, taskValue.amount.currency, mainCurrency, rates);
   }
@@ -171,6 +173,7 @@ export function computePriorityScoreConverted(
   priorityCoefficient = 1.0,
   now = Date.now(),
 ): number {
+  if (!task.taskValue || !task.remainingEstimate || !task.targetDelivery) return 0;
   const V = computeTaskValueConverted(task.taskValue, mainCurrency, rates);
   const E = parseDuration(task.remainingEstimate.iso);
   if (E <= 0) return V;
