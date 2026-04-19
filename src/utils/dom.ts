@@ -11,10 +11,10 @@ export const DOM = {
     return element;
   },
 
-  create: (tag: string, className?: string, innerHTML?: string): HTMLElement => {
+  create: (tag: string, className?: string, textContent?: string): HTMLElement => {
     const element = document.createElement(tag);
     if (className) element.className = className;
-    if (innerHTML) element.innerHTML = innerHTML;
+    if (textContent) element.textContent = textContent;
     return element;
   },
 

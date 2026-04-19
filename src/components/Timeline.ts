@@ -1,5 +1,6 @@
 import { useTaskStore } from '../store/taskStore';
 import { DOM } from '../utils/dom';
+import { showModal } from '../utils/modal';
 import type { Task } from '../types/Task';
 import {
   computePriorityScoreConverted,
@@ -9,6 +10,7 @@ import {
   formatNumber,
 } from '../utils/priority';
 import { TaskForm } from './TaskForm';
+import { Changelog } from '../utils/changelog';
 
 // -------- Constants --------
 const MS_PER_DAY = 86_400_000;
@@ -60,56 +62,53 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
-// -------- Modal helper --------
-function showModal(content: HTMLElement, onBeforeClose?: () => boolean): () => void {
-  const overlay = DOM.create('div', 'modal-overlay');
-  const box = DOM.create('div', 'modal-box');
-  const closeBtn = DOM.create('button', 'modal-close btn btn-secondary', '✕');
-  (closeBtn as HTMLButtonElement).type = 'button';
-
-  const close = (): void => {
-    if (onBeforeClose && !onBeforeClose()) return;
-    overlay.remove();
-    document.removeEventListener('keydown', handleKeyDown);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
-  };
-  document.addEventListener('keydown', handleKeyDown);
-
-  closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
-  });
-  DOM.append(box, closeBtn, content);
-  DOM.append(overlay, box);
-  document.body.appendChild(overlay);
-  return close;
-}
-
 // -------- Timeline component --------
-export const Timeline = (): HTMLElement => {
+export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
   const outer = DOM.create('div', 'timeline');
   const ruler = DOM.create('div', 'timeline-ruler');
+
+  // -------- History Scrubber --------
+  const scrubberContainer = DOM.create('div', 'timeline-scrubber');
+  const scrubberLabel = DOM.create('span', 'scrubber-label', '📜');
+  scrubberLabel.title = 'Task history scrubber – drag to replay past versions';
+  const scrubberInput = document.createElement('input');
+  scrubberInput.type = 'range';
+  scrubberInput.className = 'scrubber-range';
+  scrubberInput.min = '0';
+  scrubberInput.max = '0';
+  scrubberInput.value = '0';
+  const scrubberTimestamp = DOM.create('span', 'scrubber-timestamp', '● Live');
+  DOM.append(scrubberContainer, scrubberLabel, scrubberInput, scrubberTimestamp);
+
+  // Banner shown when viewing a historical snapshot
+  const historyBanner = DOM.create('div', 'timeline-history-banner hidden');
+
   const body = DOM.create('div', 'timeline-body');
   const canvas = DOM.create('div', 'timeline-canvas');
   const hoverLayer = DOM.create('div', 'timeline-hover-layer');
 
   DOM.append(body, canvas, hoverLayer);
-  DOM.append(outer, ruler, body);
+  DOM.append(outer, ruler, scrubberContainer, historyBanner, body);
+
+  // Local history view state – null = live, N = show state after N-th changelog entry
+  let viewHistorySeq: number | null = null;
 
   let hoverTaskId: string | null = null;
   let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   // -------- Root tasks for display --------
+  /** Returns all tasks (including sub-tasks) from live store or history. */
+  function getAllTasksForDisplay(): Task[] {
+    const store = useTaskStore.getState();
+    return viewHistorySeq !== null
+      ? Changelog.getTasksAtSeq(viewHistorySeq)
+      : store.tasks;
+  }
+
   function getSortedRootTasks(): Task[] {
     const store = useTaskStore.getState();
     const { filter, mainCurrency, exchangeRates } = store;
-    const tasks = store.tasks.filter((t) => {
+    const tasks = getAllTasksForDisplay().filter((t) => {
       if (t.parentId) return false;
       if (filter.hiddenStatuses?.includes(t.status)) return false;
       if (
@@ -343,7 +342,10 @@ export const Timeline = (): HTMLElement => {
     DOM.append(hoverLayer, tooltip);
 
     // ---- Subtasks below parent ----
-    const subTasks = store.getSubTasks(task.id).filter((s) => !filter.hiddenStatuses?.includes(s.status));
+    const allDisplayTasks = getAllTasksForDisplay();
+    const subTasks = allDisplayTasks.filter(
+      (s) => s.parentId === task.id && !filter.hiddenStatuses?.includes(s.status),
+    );
 
     const subHeight = effectiveHeight * 0.75;
     const subY = rectTop + effectiveHeight + TASK_GAP;
@@ -370,8 +372,13 @@ export const Timeline = (): HTMLElement => {
     });
   }
 
-  // -------- Task action modal --------
+  // -------- Task action modal (fallback when no onEditTask callback) --------
   function showTaskEditModal(task: Task): void {
+    if (onEditTask) {
+      onEditTask(task);
+      return;
+    }
+
     const container = DOM.create('div', 'task-action-modal');
     let closeModal: () => void;
 
@@ -436,6 +443,13 @@ export const Timeline = (): HTMLElement => {
   });
 
   // -------- Wheel events --------
+  // Scroll mapping:
+  //   Ctrl + deltaY          → horizontal zoom (keep cursor-time fixed)
+  //   deltaX (touchpad)      → horizontal pan (timeline scroll left/right)
+  //   Shift + deltaY         → vertical zoom
+  //   plain deltaY           → vertical scroll
+  // deltaX and deltaY are handled independently so diagonal touchpad swipes
+  // pan and scroll simultaneously.
   outer.addEventListener(
     'wheel',
     (e) => {
@@ -443,7 +457,7 @@ export const Timeline = (): HTMLElement => {
       const store = useTaskStore.getState();
 
       if (e.ctrlKey) {
-        // Horizontal zoom – keep time under cursor fixed
+        // Ctrl + vertical wheel → horizontal zoom (keep time under cursor fixed)
         const zoomDelta = e.deltaY > 0 ? -10 : 10;
         const newZoom = Math.max(10, Math.min(2000, store.horizontalZoom + zoomDelta));
         const bodyRect = body.getBoundingClientRect();
@@ -452,27 +466,91 @@ export const Timeline = (): HTMLElement => {
         const newOriginMs = timeAtMouse - mouseX / getPxPerMs(newZoom);
         store.setHorizontalZoom(newZoom);
         store.setTimelineOriginMs(newOriginMs);
-      } else if (e.shiftKey) {
-        // Vertical zoom
-        const zoomDelta = e.deltaY > 0 ? -10 : 10;
-        const newZoom = Math.max(10, Math.min(500, store.verticalZoom + zoomDelta));
-        store.setVerticalZoom(newZoom);
-      } else {
-        // Vertical scroll
-        const tasks = getSortedRootTasks();
-        const effectiveHeight = store.taskHeight * (store.verticalZoom / 100);
-        const totalHeight = tasks.length * (effectiveHeight + TASK_GAP);
-        const bodyH = body.clientHeight || 400;
-        const maxOffset = Math.max(0, totalHeight - bodyH);
-        const newOffset = Math.max(0, Math.min(maxOffset, store.verticalOffset + e.deltaY * SCROLL_SPEED_MULTIPLIER));
-        store.setVerticalOffset(newOffset);
+        return; // don't process deltaX when zooming
+      }
+
+      // Horizontal pan via deltaX (touchpad two-finger horizontal swipe)
+      if (e.deltaX !== 0) {
+        const MS_PER_DAY_LOCAL = 86_400_000;
+        const PAN_LIMIT_MS = 100 * 365 * MS_PER_DAY_LOCAL; // ±100 years from today
+        const panMs = e.deltaX / getPxPerMs(store.horizontalZoom);
+        const newOrigin = Math.max(
+          Date.now() - PAN_LIMIT_MS,
+          Math.min(Date.now() + PAN_LIMIT_MS, store.timelineOriginMs + panMs),
+        );
+        store.setTimelineOriginMs(newOrigin);
+      }
+
+      // Vertical scroll or zoom via deltaY
+      if (e.deltaY !== 0) {
+        if (e.shiftKey) {
+          // Shift + vertical wheel → vertical zoom
+          const zoomDelta = e.deltaY > 0 ? -10 : 10;
+          const newZoom = Math.max(10, Math.min(500, store.verticalZoom + zoomDelta));
+          store.setVerticalZoom(newZoom);
+        } else {
+          // Plain vertical wheel → vertical scroll
+          const tasks = getSortedRootTasks();
+          const effectiveHeight = store.taskHeight * (store.verticalZoom / 100);
+          const totalHeight = tasks.length * (effectiveHeight + TASK_GAP);
+          const bodyH = body.clientHeight || 400;
+          const maxOffset = Math.max(0, totalHeight - bodyH);
+          const newOffset = Math.max(0, Math.min(maxOffset, store.verticalOffset + e.deltaY * SCROLL_SPEED_MULTIPLIER));
+          store.setVerticalOffset(newOffset);
+        }
       }
     },
     { passive: false },
   );
 
+  // -------- History scrubber --------
+  function updateScrubber(): void {
+    const count = Changelog.getEntryCount();
+    const wasAtMax = parseInt(scrubberInput.value, 10) >= parseInt(scrubberInput.max, 10);
+    scrubberInput.max = String(count);
+    if (wasAtMax || count === 0) {
+      // Stay at live (rightmost) position
+      scrubberInput.value = String(count);
+    }
+    // Refresh the timestamp label if needed
+    refreshScrubberLabel();
+  }
+
+  function refreshScrubberLabel(): void {
+    const count = Changelog.getEntryCount();
+    const val = parseInt(scrubberInput.value, 10);
+    const isLive = val >= count || count === 0;
+    if (isLive) {
+      scrubberTimestamp.textContent = '● Live';
+      scrubberContainer.classList.remove('in-history');
+      historyBanner.classList.add('hidden');
+      viewHistorySeq = null;
+    } else {
+      // `val` is a 1-based count of how many entries to apply (slider range: 0 = empty … N = live).
+      // getEntryAt() uses a 0-based array index, so the last applied entry is at index val - 1.
+      const entry = Changelog.getEntryAt(val - 1);
+      const ts = entry ? new Date(entry.timestamp).toLocaleString() : '';
+      const taskTitle = entry
+        ? `${entry.type === 'delete' ? '🗑' : entry.type === 'create' ? '✚' : '✎'} "${entry.newState?.title ?? entry.previousState?.title ?? entry.taskId}"`
+        : '';
+      scrubberTimestamp.textContent = ts;
+      historyBanner.textContent = `📜 History snapshot – ${ts}${taskTitle ? ': ' + taskTitle : ''} (${val}/${count})`;
+      scrubberContainer.classList.add('in-history');
+      historyBanner.classList.remove('hidden');
+      // viewHistorySeq is the seq cutoff passed to getTasksAtSeq(); val serves as both
+      // the 1-based slider position and the max seq to include (seq numbers are sequential).
+      viewHistorySeq = val;
+    }
+  }
+
+  scrubberInput.addEventListener('input', () => {
+    refreshScrubberLabel();
+    renderCanvas();
+  });
+
   // -------- Store subscription --------
   useTaskStore.subscribe(() => {
+    updateScrubber();
     renderRuler();
     renderCanvas();
   });
@@ -499,6 +577,7 @@ export const Timeline = (): HTMLElement => {
       );
       state.setTimelineOriginMs(newOrigin);
     }
+    updateScrubber();
     renderRuler();
     renderCanvas();
   }, LAYOUT_SETTLE_DELAY);
