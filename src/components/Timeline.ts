@@ -439,8 +439,14 @@ export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
 
       // Horizontal pan via deltaX (touchpad two-finger horizontal swipe)
       if (e.deltaX !== 0) {
+        const MS_PER_DAY_LOCAL = 86_400_000;
+        const PAN_LIMIT_MS = 100 * 365 * MS_PER_DAY_LOCAL; // ±100 years from today
         const panMs = e.deltaX / getPxPerMs(store.horizontalZoom);
-        store.setTimelineOriginMs(store.timelineOriginMs + panMs);
+        const newOrigin = Math.max(
+          Date.now() - PAN_LIMIT_MS,
+          Math.min(Date.now() + PAN_LIMIT_MS, store.timelineOriginMs + panMs),
+        );
+        store.setTimelineOriginMs(newOrigin);
       }
 
       // Vertical scroll or zoom via deltaY

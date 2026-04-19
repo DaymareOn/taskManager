@@ -634,7 +634,11 @@ test.describe('Data Model compliance', () => {
       expect(typeof t.description, label('description must be a string')).toBe('string');
 
       // status: one of the valid values
-      expect(VALID_STATUSES.has(t.status as string), label(`status "${String(t.status)}" must be one of ${[...VALID_STATUSES].join(', ')}`)).toBe(true);
+      const validStatusList = [...VALID_STATUSES].join(', ');
+      expect(
+        VALID_STATUSES.has(t.status as string),
+        label(`status "${String(t.status)}" must be one of ${validStatusList}`),
+      ).toBe(true);
 
       // createdAt: non-empty ISO 8601 datetime string
       expect(typeof t.createdAt, label('createdAt must be a string')).toBe('string');

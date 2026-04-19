@@ -36,9 +36,9 @@ const MIGRATIONS: Migration[] = [
 
 /** Numeric semver comparison (returns negative / 0 / positive). */
 function compareVersions(a: string, b: string): number {
-  const parse = (v: string): number[] => v.split('.').map(Number);
-  const [aMaj, aMin, aPat] = parse(a);
-  const [bMaj, bMin, bPat] = parse(b);
+  const parse = (v: string): number[] => v.split('.').map((n) => parseInt(n, 10) || 0);
+  const [aMaj = 0, aMin = 0, aPat = 0] = parse(a);
+  const [bMaj = 0, bMin = 0, bPat = 0] = parse(b);
   if (aMaj !== bMaj) return aMaj - bMaj;
   if (aMin !== bMin) return aMin - bMin;
   return aPat - bPat;
