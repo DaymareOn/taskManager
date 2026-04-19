@@ -1,6 +1,7 @@
 import { DOM } from '../utils/dom';
 import { useTaskStore } from '../store/taskStore';
 import type { Task } from '../types/Task';
+import { t, onLocaleChange } from '../utils/i18n';
 
 /** Trigger a file download in the browser. */
 function downloadFile(filename: string, content: string, mimeType = 'application/json'): void {
@@ -33,7 +34,7 @@ export const ImportExport = (): HTMLElement => {
   const bar = DOM.create('div', 'import-export-bar');
 
   // --- Export button ---
-  const exportBtn = DOM.create('button', 'btn btn-secondary', '⬇ Export tasks');
+  const exportBtn = DOM.create('button', 'btn btn-secondary', t('io.export'));
   exportBtn.title = 'Download all tasks as a JSON file';
   exportBtn.addEventListener('click', () => {
     const json = useTaskStore.getState().exportTasks();
@@ -41,8 +42,13 @@ export const ImportExport = (): HTMLElement => {
   });
 
   // --- Import button + hidden file input ---
-  const importBtn = DOM.create('button', 'btn btn-secondary', '⬆ Import tasks');
+  const importBtn = DOM.create('button', 'btn btn-secondary', t('io.import'));
   importBtn.title = 'Load tasks from a JSON file (replaces current tasks)';
+
+  onLocaleChange(() => {
+    exportBtn.textContent = t('io.export');
+    importBtn.textContent = t('io.import');
+  });
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';

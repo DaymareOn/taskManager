@@ -561,10 +561,7 @@ export const TaskForm = (
     periodBuilder.element.addEventListener('change', scheduleAutoSave);
     deliveryDurationBuilder.element.addEventListener('change', scheduleAutoSave);
 
-    // Value-type and delivery-type toggles: handled by their onChange callbacks
-    const origValueTypeFn = valueTypeToggle.element.dataset._origOnChange;
-    void origValueTypeFn; // no-op; handled in toggle callbacks above
-
+    // Value-type and delivery-type toggles: handled by their onChange callbacks above.
     // Wrap value/delivery type toggle onChange to also auto-save
     valueTypeToggle.element.querySelectorAll<HTMLElement>('.toggle-btn').forEach((btn) => {
       btn.addEventListener('click', scheduleAutoSave);

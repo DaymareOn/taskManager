@@ -156,7 +156,7 @@ export const ToolsColumn = (): HTMLElement => {
     });
     DOM.append(themeSection, btn);
   });
-  DOM.append(themeSection, themeSectionHeader);
+  // Insert the section header before the buttons so it appears at the top
   themeSection.insertBefore(themeSectionHeader, themeSection.firstChild);
 
   // ---- Overlays section ----

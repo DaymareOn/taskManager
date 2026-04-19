@@ -91,6 +91,8 @@ export function t(key: string, params?: Record<string, string>): string {
 /**
  * Create a live <span> element whose text content automatically updates
  * when the locale changes.
+ * Note: the listener is never unsubscribed. Only use for long-lived elements
+ * that exist for the entire session (e.g. mounted once on page load).
  */
 export function liveT(key: string, params?: Record<string, string>): HTMLElement {
   const span = document.createElement('span');

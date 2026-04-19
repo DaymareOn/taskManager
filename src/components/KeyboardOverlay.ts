@@ -205,8 +205,7 @@ function buildTouchSection(): HTMLElement {
     DOM.append(section, row);
   });
 
-  DOM.append(section, title);
-  // Re-insert title before the rows
+  // Insert title at the top
   section.insertBefore(title, section.firstChild);
   return section;
 }
@@ -349,17 +348,6 @@ export const KeyboardOverlay = (): KeyboardOverlayApi => {
 
   return { element: overlay, open, close, isOpen: () => _open, refresh };
 };
-
-// ─── Mouse button helper (kept for potential external use) ────────────────────
-function buildMouseButton(label: string, bindingId: string): HTMLElement {
-  const btn = DOM.create('div', 'ko-key ko-mouse-btn');
-  btn.dataset.binding = bindingId;
-  const lbl  = DOM.create('span', 'ko-key-label', label);
-  const desc = DOM.create('span', 'ko-key-desc', KeyboardConfigManager.getBinding(bindingId));
-  DOM.append(btn, lbl, desc);
-  return btn;
-}
-void buildMouseButton; // suppress unused warning
 
 /** The reset-to-defaults helper, exported for use in ToolsColumn. */
 export function resetOverlayDefaults(): void {
