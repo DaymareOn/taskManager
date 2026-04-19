@@ -19,23 +19,30 @@ export interface KeyboardConfig {
 // ---- Default descriptions ----
 export const DEFAULT_BINDINGS: Record<string, string> = {
   // Mouse
-  'mouse:left':         'Open task / Add task (click empty area)',
+  'mouse:left':         'Open task (click task bar) / Add task (click empty area)',
   'mouse:right':        '(no action)',
   'mouse:middle':       '(no action)',
-  'mouse:wheel-up':     'Scroll up',
-  'mouse:wheel-down':   'Scroll down',
-  'mouse:wheel-left':   'Pan timeline left',
-  'mouse:wheel-right':  'Pan timeline right',
+  'mouse:wheel-up':     'Scroll tasks up',
+  'mouse:wheel-down':   'Scroll tasks down',
+  'mouse:wheel-left':   'Pan timeline left (touchpad horizontal swipe)',
+  'mouse:wheel-right':  'Pan timeline right (touchpad horizontal swipe)',
   // Keyboard
-  'key:F1':             'Open keyboard help overlay',
+  'key:F1':             'Open keyboard & mouse reference overlay',
+  'key:F2':             'Open concepts & glossary overlay',
   'key:Escape':         'Close modal / overlay',
-  'key:Ctrl+Wheel':     'Horizontal zoom (keep cursor position)',
-  'key:Shift+Wheel':    'Vertical zoom',
+  'key:ArrowLeft':      'History scrubber: go to previous recorded version (when scrubber is focused)',
+  'key:ArrowRight':     'History scrubber: go to next recorded version (when scrubber is focused)',
+  'key:Ctrl+Wheel':     'Horizontal zoom (keeps the time under the cursor fixed)',
+  'key:Shift+Wheel':    'Vertical zoom (adjusts task bar height)',
 };
 
 export const DEFAULT_HELP_KEY = 'F1';
 
 function load(): KeyboardConfig {
+  if (typeof localStorage === 'undefined') {
+    // Running outside a browser (e.g. Node.js test environment) – return defaults.
+    return { helpKey: DEFAULT_HELP_KEY, bindings: { ...DEFAULT_BINDINGS } };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {

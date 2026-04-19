@@ -10,6 +10,7 @@ import {
   formatNumber,
 } from '../utils/priority';
 import { TaskForm } from './TaskForm';
+import { Changelog } from '../utils/changelog';
 
 // -------- Constants --------
 const MS_PER_DAY = 86_400_000;
@@ -65,21 +66,49 @@ function escapeHtml(str: string): string {
 export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
   const outer = DOM.create('div', 'timeline');
   const ruler = DOM.create('div', 'timeline-ruler');
+
+  // -------- History Scrubber --------
+  const scrubberContainer = DOM.create('div', 'timeline-scrubber');
+  const scrubberLabel = DOM.create('span', 'scrubber-label', '📜');
+  scrubberLabel.title = 'Task history scrubber – drag to replay past versions';
+  const scrubberInput = document.createElement('input');
+  scrubberInput.type = 'range';
+  scrubberInput.className = 'scrubber-range';
+  scrubberInput.min = '0';
+  scrubberInput.max = '0';
+  scrubberInput.value = '0';
+  const scrubberTimestamp = DOM.create('span', 'scrubber-timestamp', '● Live');
+  DOM.append(scrubberContainer, scrubberLabel, scrubberInput, scrubberTimestamp);
+
+  // Banner shown when viewing a historical snapshot
+  const historyBanner = DOM.create('div', 'timeline-history-banner hidden');
+
   const body = DOM.create('div', 'timeline-body');
   const canvas = DOM.create('div', 'timeline-canvas');
   const hoverLayer = DOM.create('div', 'timeline-hover-layer');
 
   DOM.append(body, canvas, hoverLayer);
-  DOM.append(outer, ruler, body);
+  DOM.append(outer, ruler, scrubberContainer, historyBanner, body);
+
+  // Local history view state – null = live, N = show state after N-th changelog entry
+  let viewHistorySeq: number | null = null;
 
   let hoverTaskId: string | null = null;
   let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   // -------- Root tasks for display --------
+  /** Returns all tasks (including sub-tasks) from live store or history. */
+  function getAllTasksForDisplay(): Task[] {
+    const store = useTaskStore.getState();
+    return viewHistorySeq !== null
+      ? Changelog.getTasksAtSeq(viewHistorySeq)
+      : store.tasks;
+  }
+
   function getSortedRootTasks(): Task[] {
     const store = useTaskStore.getState();
     const { filter, mainCurrency, exchangeRates } = store;
-    const tasks = store.tasks.filter((t) => {
+    const tasks = getAllTasksForDisplay().filter((t) => {
       if (t.parentId) return false;
       if (filter.hiddenStatuses?.includes(t.status)) return false;
       if (
@@ -313,7 +342,10 @@ export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
     DOM.append(hoverLayer, tooltip);
 
     // ---- Subtasks below parent ----
-    const subTasks = store.getSubTasks(task.id).filter((s) => !filter.hiddenStatuses?.includes(s.status));
+    const allDisplayTasks = getAllTasksForDisplay();
+    const subTasks = allDisplayTasks.filter(
+      (s) => s.parentId === task.id && !filter.hiddenStatuses?.includes(s.status),
+    );
 
     const subHeight = effectiveHeight * 0.75;
     const subY = rectTop + effectiveHeight + TASK_GAP;
@@ -471,8 +503,50 @@ export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
     { passive: false },
   );
 
+  // -------- History scrubber --------
+  function updateScrubber(): void {
+    const count = Changelog.getEntryCount();
+    const wasAtMax = parseInt(scrubberInput.value, 10) >= parseInt(scrubberInput.max, 10);
+    scrubberInput.max = String(count);
+    if (wasAtMax || count === 0) {
+      // Stay at live (rightmost) position
+      scrubberInput.value = String(count);
+    }
+    // Refresh the timestamp label if needed
+    refreshScrubberLabel();
+  }
+
+  function refreshScrubberLabel(): void {
+    const count = Changelog.getEntryCount();
+    const val = parseInt(scrubberInput.value, 10);
+    const isLive = val >= count || count === 0;
+    if (isLive) {
+      scrubberTimestamp.textContent = '● Live';
+      scrubberContainer.classList.remove('in-history');
+      historyBanner.classList.add('hidden');
+      viewHistorySeq = null;
+    } else {
+      const entry = Changelog.getEntryAt(val - 1); // val entries applied; last one is at index val-1
+      const ts = entry ? new Date(entry.timestamp).toLocaleString() : '';
+      const taskTitle = entry
+        ? `${entry.type === 'delete' ? '🗑' : entry.type === 'create' ? '✚' : '✎'} "${entry.newState?.title ?? entry.previousState?.title ?? entry.taskId}"`
+        : '';
+      scrubberTimestamp.textContent = ts;
+      historyBanner.textContent = `📜 History snapshot – ${ts}${taskTitle ? ': ' + taskTitle : ''} (${val}/${count})`;
+      scrubberContainer.classList.add('in-history');
+      historyBanner.classList.remove('hidden');
+      viewHistorySeq = val; // set before renderCanvas
+    }
+  }
+
+  scrubberInput.addEventListener('input', () => {
+    refreshScrubberLabel();
+    renderCanvas();
+  });
+
   // -------- Store subscription --------
   useTaskStore.subscribe(() => {
+    updateScrubber();
     renderRuler();
     renderCanvas();
   });
@@ -499,6 +573,7 @@ export const Timeline = (onEditTask?: (task: Task) => void): HTMLElement => {
       );
       state.setTimelineOriginMs(newOrigin);
     }
+    updateScrubber();
     renderRuler();
     renderCanvas();
   }, LAYOUT_SETTLE_DELAY);

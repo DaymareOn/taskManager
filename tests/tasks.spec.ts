@@ -43,12 +43,18 @@
  *
  * Test suite 10 – Tools panel collapse / expand
  *   Verifies that the toggle button collapses and expands the tools panel.
+ *
+ * Test suite 11 – F1 overlay documentation coverage
+ *   Pure Node.js test (no browser). Verifies that every app-specific
+ *   mouse / keyboard interaction is present in the DEFAULT_BINDINGS of the
+ *   keyboard help overlay with a non-empty description.
  */
 
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { DEFAULT_BINDINGS } from '../src/utils/keyboardConfig';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -708,3 +714,58 @@ test.describe('Data Model compliance', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// Suite 11 – F1 overlay documentation coverage
+// Pure Node.js test – verifies every app-specific interaction has a
+// documented, non-empty description in the DEFAULT_BINDINGS record.
+// ---------------------------------------------------------------------------
+
+/**
+ * Exhaustive list of interaction IDs that the app implements and that MUST
+ * appear in the keyboard/mouse reference overlay with a non-empty description.
+ *
+ * How to maintain this list:
+ *   When a new mouse or keyboard interaction is added to the app, add its
+ *   binding id here AND update DEFAULT_BINDINGS in keyboardConfig.ts.
+ *   The test will fail if the two lists go out of sync.
+ */
+const REQUIRED_INTERACTION_IDS: string[] = [
+  // ── Mouse interactions ────────────────────────────────────────────────────
+  'mouse:left',        // open task editor / add task by clicking
+  'mouse:wheel-up',    // scroll task list up
+  'mouse:wheel-down',  // scroll task list down
+  'mouse:wheel-left',  // pan timeline left  (touchpad horizontal swipe)
+  'mouse:wheel-right', // pan timeline right (touchpad horizontal swipe)
+
+  // ── Keyboard-modified scroll interactions ─────────────────────────────────
+  'key:Ctrl+Wheel',    // horizontal zoom
+  'key:Shift+Wheel',   // vertical zoom
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  'key:F1',            // open keyboard & mouse reference overlay
+  'key:F2',            // open concepts & glossary overlay
+  'key:Escape',        // close active modal / overlay
+  'key:ArrowLeft',     // history scrubber: go to previous version (when focused)
+  'key:ArrowRight',    // history scrubber: go to next version   (when focused)
+];
+
+test.describe('F1 Overlay documentation coverage', () => {
+  test('DEFAULT_BINDINGS contains all required app interactions with non-empty descriptions', () => {
+    REQUIRED_INTERACTION_IDS.forEach((id) => {
+      const description = DEFAULT_BINDINGS[id];
+
+      expect(
+        description !== undefined,
+        `Binding id "${id}" is missing from DEFAULT_BINDINGS in keyboardConfig.ts. ` +
+          'Add it to both REQUIRED_INTERACTION_IDS (test) and DEFAULT_BINDINGS (source).',
+      ).toBe(true);
+
+      expect(
+        (description ?? '').trim().length > 0,
+        `Binding id "${id}" has an empty description in DEFAULT_BINDINGS. ` +
+          'Every app-specific interaction must have a meaningful default description.',
+      ).toBe(true);
+    });
+  });
+});

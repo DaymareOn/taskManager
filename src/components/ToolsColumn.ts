@@ -4,6 +4,7 @@ import type { Theme } from '../store/taskStore';
 import { FilterBar } from './FilterBar';
 import { ImportExport } from './ImportExport';
 import { KeyboardConfigManager } from '../utils/keyboardConfig';
+import { ConceptsConfigManager } from '../utils/conceptsConfig';
 
 /** ISO 4217 currencies shown in the Main Currency picker */
 const CURRENCIES: Array<{ code: string; name: string }> = [
@@ -178,42 +179,63 @@ export const ToolsColumn = (): HTMLElement => {
     DOM.append(themeSection, btn);
   });
 
-  // ---- Help section ----
-  const helpSection = createSection('⌨ Keyboard Help');
+  // ---- Overlays section ----
+  const overlaysSection = createSection('⌨ Overlays');
 
+  // F1 – Keyboard reference overlay
   const helpKeyRow  = DOM.create('div', 'tools-row');
-  const helpKeyLabel = DOM.create('span', 'tools-label', '🆘 Help key');
+  const helpKeyLabel = DOM.create('span', 'tools-label', '🆘 Help key (F1)');
   const helpKeyInput = DOM.create('input', 'form-input tools-help-key-input') as HTMLInputElement;
   helpKeyInput.type        = 'text';
   helpKeyInput.maxLength   = 20;
   helpKeyInput.value       = KeyboardConfigManager.get().helpKey;
   helpKeyInput.placeholder = 'e.g. F1';
-  helpKeyInput.title       = 'Press a key to set the shortcut that opens the overlay';
+  helpKeyInput.title       = 'Press a key to set the shortcut that opens the keyboard/mouse overlay';
 
-  // Update the config when the user focuses the input and presses a key
   helpKeyInput.addEventListener('keydown', (e) => {
     e.preventDefault();
     const key = e.key;
-    if (key === 'Escape') {
-      helpKeyInput.blur();
-      return;
-    }
+    if (key === 'Escape') { helpKeyInput.blur(); return; }
     helpKeyInput.value = key;
     KeyboardConfigManager.setHelpKey(key);
   });
 
   DOM.append(helpKeyRow, helpKeyLabel, helpKeyInput);
 
-  const openHelpBtn = DOM.create('button', 'btn btn-secondary tools-open-help-btn', '⌨ Open overlay (F1)');
+  const openHelpBtn = DOM.create('button', 'btn btn-secondary tools-open-help-btn', '⌨ Open keyboard overlay');
   openHelpBtn.addEventListener('click', () => {
-    // Dispatch a custom event that main.ts listens to
     document.dispatchEvent(new CustomEvent('open-keyboard-overlay'));
   });
 
-  DOM.append(helpSection, helpKeyRow, openHelpBtn);
+  // F2 – Concepts overlay
+  const conceptsKeyRow = DOM.create('div', 'tools-row');
+  const conceptsKeyLabel = DOM.create('span', 'tools-label', '💡 Concepts key (F2)');
+  const conceptsKeyInput = DOM.create('input', 'form-input tools-help-key-input') as HTMLInputElement;
+  conceptsKeyInput.type        = 'text';
+  conceptsKeyInput.maxLength   = 20;
+  conceptsKeyInput.value       = ConceptsConfigManager.get().conceptsKey;
+  conceptsKeyInput.placeholder = 'e.g. F2';
+  conceptsKeyInput.title       = 'Press a key to set the shortcut that opens the concepts & glossary overlay';
+
+  conceptsKeyInput.addEventListener('keydown', (e) => {
+    e.preventDefault();
+    const key = e.key;
+    if (key === 'Escape') { conceptsKeyInput.blur(); return; }
+    conceptsKeyInput.value = key;
+    ConceptsConfigManager.setConceptsKey(key);
+  });
+
+  DOM.append(conceptsKeyRow, conceptsKeyLabel, conceptsKeyInput);
+
+  const openConceptsBtn = DOM.create('button', 'btn btn-secondary tools-open-help-btn', '💡 Open concepts overlay');
+  openConceptsBtn.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('open-concepts-overlay'));
+  });
+
+  DOM.append(overlaysSection, helpKeyRow, openHelpBtn, conceptsKeyRow, openConceptsBtn);
 
   // Assemble inner
-  DOM.append(inner, titleEl, searchSection, ioSection, displaySection, currencySection, themeSection, helpSection);
+  DOM.append(inner, titleEl, searchSection, ioSection, displaySection, currencySection, themeSection, overlaysSection);
   DOM.append(col, toggleBtn, inner);
 
   // ---- Subscribe to store for live updates ----

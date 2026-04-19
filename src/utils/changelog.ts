@@ -119,6 +119,45 @@ export const Changelog = {
     return [..._log];
   },
 
+  /** Total number of recorded entries. */
+  getEntryCount(): number {
+    ensureLoaded();
+    return _log.length;
+  },
+
+  /**
+   * Return the entry at a given 0-based index, or undefined if out of range.
+   * Index 0 is the oldest entry, index N-1 is the newest.
+   */
+  getEntryAt(index: number): ChangeEntry | undefined {
+    ensureLoaded();
+    return _log[index];
+  },
+
+  /**
+   * Reconstruct the full task list as it was after the first `cutoffSeq`
+   * changelog entries have been applied.
+   *
+   * - cutoffSeq = 0  → state before any recorded change (may be empty)
+   * - cutoffSeq = N  → same as the live task list (all N entries applied)
+   *
+   * The parameter is a 1-based sequence number matching ChangeEntry.seq.
+   * Entries with seq > cutoffSeq are ignored.
+   */
+  getTasksAtSeq(cutoffSeq: number): Task[] {
+    ensureLoaded();
+    const taskMap = new Map<string, Task>();
+    for (const entry of _log) {
+      if (entry.seq > cutoffSeq) break;
+      if ((entry.type === 'create' || entry.type === 'update') && entry.newState) {
+        taskMap.set(entry.taskId, entry.newState);
+      } else if (entry.type === 'delete') {
+        taskMap.delete(entry.taskId);
+      }
+    }
+    return Array.from(taskMap.values());
+  },
+
   /** Clear the in-memory cache (used after import to start fresh). */
   reset(): void {
     _log = [];
