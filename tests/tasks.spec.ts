@@ -395,25 +395,27 @@ test.describe('Add a sub-task via the Timeline modal', () => {
     await page.click('button:has-text("Add Sub-task")');
     await expect(page.locator('.modal-overlay .task-form')).toBeVisible({ timeout: 5_000 });
 
-    // Fill in the sub-task details (column is collapsed so its form is hidden)
-    await page.fill('input[placeholder="Task title"]', 'Replace the faucet washer');
-    await page.fill('input[placeholder="Amount (e.g. 1500)"]', '25');
+    // Scope all fills to the modal to avoid ambiguity with the collapsed edit column's form
+    const modal = page.locator('.modal-overlay');
+
+    await modal.locator('input[placeholder="Task title"]').fill('Replace the faucet washer');
+    await modal.locator('input[placeholder="Amount (e.g. 1500)"]').fill('25');
 
     const deliveryDate = new Date();
     deliveryDate.setDate(deliveryDate.getDate() + 14);
-    await page
+    await modal
       .locator('.form-score-section input[type="date"]')
       .fill(deliveryDate.toISOString().slice(0, 10));
 
     // Fill remaining estimate via the duration builder (PT2H = 2 hours)
-    await page
+    await modal
       .locator('.form-score-section .duration-builder')
       .last()
       .locator('.duration-num')
       .nth(4) // index 4 = Hours field (Y=0, M=1, W=2, D=3, H=4)
       .fill('2');
 
-    await page.click('button[type="submit"]');
+    await modal.locator('button[type="submit"]').click();
 
     // Wait for the sub-task modal to close, then hover the parent to reveal its sub-tasks
     await expect(page.locator('.modal-overlay')).toHaveCount(0, { timeout: 5_000 });
