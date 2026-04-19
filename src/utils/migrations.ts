@@ -15,18 +15,36 @@ interface Migration {
 }
 
 /**
- * No migrations defined yet – this is the first versioned release (v0.1.0).
- * Add a new entry here whenever DATA_VERSION is bumped.
- *
- * Example (uncomment when needed):
- *   {
- *     fromVersion: '0.1.0',
- *     toVersion:   '0.2.0',
- *     up: (tasks) => tasks.map((t) => ({ newField: 'default', ...(t as object) })),
- *   },
+ * Migrations list – one entry per DATA_VERSION bump.
+ * The first entry brings unversioned (pre-0.1.0) data up to v0.1.0 by
+ * backfilling the priority-score fields (`taskValue`, `targetDelivery`,
+ * `remainingEstimate`) that were absent in the original schema.
  */
+
+/** Default deadline offset (ms) applied when a legacy task has no dueDate. */
+const DEFAULT_DEADLINE_OFFSET_MS = 30 * 86_400_000; // 30 days
+
 const MIGRATIONS: Migration[] = [
-  // First versioned release (v0.1.0). Future migrations go here, e.g.:
+  {
+    fromVersion: '0.0.0',
+    toVersion: '0.1.0',
+    up: (tasks) =>
+      tasks.map((t) => {
+        const task = t as Record<string, unknown>;
+        // Derive a best-effort targetDelivery from the legacy dueDate field.
+        const fallbackDelivery =
+          typeof task.dueDate === 'string' && task.dueDate
+            ? task.dueDate
+            : new Date(Date.now() + DEFAULT_DEADLINE_OFFSET_MS).toISOString().slice(0, 10);
+        return {
+          taskValue: { type: 'direct', amount: { amount: 0, currency: 'EUR' } },
+          targetDelivery: fallbackDelivery,
+          remainingEstimate: { iso: 'PT1H' },
+          ...task,
+        };
+      }),
+  },
+  // Future migrations go here, e.g.:
   //   {
   //     fromVersion: '0.1.0',
   //     toVersion:   '0.2.0',

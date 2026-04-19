@@ -90,12 +90,9 @@ export const StorageManager = {
 
   importTasks: (jsonData: string): Task[] => {
     try {
-      const parsed: unknown = JSON.parse(jsonData);
-      // Support importing both plain arrays and versioned envelopes.
-      if (Array.isArray(parsed)) return parsed as Task[];
-      const envelope = parsed as StoredData;
-      if (Array.isArray(envelope.tasks)) return envelope.tasks;
-      return [];
+      // Reuse parseStoredData so that both plain-array and versioned-envelope
+      // imports are migrated to the current schema just like localStorage loads.
+      return parseStoredData(jsonData);
     } catch (error) {
       console.error('Failed to parse imported tasks:', error);
       return [];
