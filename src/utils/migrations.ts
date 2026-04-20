@@ -7,7 +7,15 @@ import taskSchema from '../schemas/task.schema.json';
  * Bump the schema's `$id` (and add a Migration entry below) whenever the
  * Task schema changes.
  */
-export const DATA_VERSION: string = taskSchema.$id.replace(/^.*-v/, '');
+// Extracts "0.1.0" from a $id like "task-schema-v0.1.0".
+const versionMatch = taskSchema.$id.match(/^.*-v(\d+\.\d+\.\d+)$/);
+if (!versionMatch) {
+  throw new Error(
+    `task.schema.json $id has unexpected format: "${taskSchema.$id}". ` +
+    'Expected "task-schema-v<semver>", e.g. "task-schema-v0.1.0".',
+  );
+}
+export const DATA_VERSION: string = versionMatch[1];
 
 /** Signature for a single version-step migration. */
 interface Migration {
