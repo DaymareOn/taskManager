@@ -56,6 +56,14 @@ const MIGRATIONS: Migration[] = [
         };
       }),
   },
+  {
+    fromVersion: '0.1.0',
+    toVersion: '0.1.1',
+    // No structural data changes – $id was bumped automatically by the
+    // pre-commit hook when the schema file was touched.  This entry exists
+    // solely to keep the migration chain contiguous up to DATA_VERSION.
+    up: (tasks) => tasks,
+  },
   // Future migrations go here, e.g.:
   //   {
   //     fromVersion: '0.1.0',
