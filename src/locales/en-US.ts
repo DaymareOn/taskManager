@@ -71,6 +71,7 @@ export const en_US: Record<string, string> = {
   'form.startDate': 'Start date (optional)',
   'form.addTask': 'Add Task',
   'form.addSubTask': 'Add Sub-task',
+  'form.assignee': 'Assignee (optional)',
   'form.statusTodo': '⬜ To Do',
   'form.statusInProgress': '🔄 In Progress',
   'form.statusDone': '✅ Done',

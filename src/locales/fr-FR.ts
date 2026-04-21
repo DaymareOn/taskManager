@@ -71,6 +71,7 @@ export const fr_FR: Record<string, string> = {
   'form.startDate': 'Date de début (optionnelle)',
   'form.addTask': 'Ajouter la tâche',
   'form.addSubTask': 'Ajouter la sous-tâche',
+  'form.assignee': 'Responsable (optionnel)',
   'form.statusTodo': '⬜ À faire',
   'form.statusInProgress': '🔄 En cours',
   'form.statusDone': '✅ Terminé',
