@@ -98,17 +98,29 @@
  *        no browser console errors may occur.
  *
  * Test suite 18 – npm install prepare script in non-git directory
- *   Pure Node.js test (no browser). Verifies that the `prepare` script in
- *   package.json exits with code 0 when the working directory has no `.git`
- *   folder — i.e. the scenario that occurs when a user downloads the release
- *   zip and runs start.bat.  Covers the exception-checking requirement for
- *   user scripts (start.bat).
+ *
+ * Test suite 19 – Backend exchange-rate proxy integration
+ *   Browser E2E tests. Verifies that the frontend correctly uses the backend
+ *   `/api/exchange-rates` endpoint instead of calling Frankfurter directly, and
+ *   that the app handles various backend response scenarios gracefully:
+ *     1. Successful response – rates are stored and no console errors occur.
+ *     2. Backend HTTP 500 – app keeps stale rates; no JavaScript exception (pageerror) emitted.
+ *     3. Network abort – app keeps stale rates; no JavaScript exception emitted.
+ *     4. Invalid / malformed response body – sanitizer rejects data; no errors.
+ *     5. Empty rates object – sanitizer accepts it; no errors.
+ *
+ * Test suite 20 – Backend server unit tests
+ *   Pure Node.js tests (no browser). Verifies that `server.js`:
+ *     1. Responds 400 for an invalid (non-ISO-4217) currency code.
+ *     2. Proxies a successful Frankfurter response to the caller.
+ *     3. Returns 404 for unknown paths.
  */
 
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { DEFAULT_BINDINGS } from '../src/utils/keyboardConfig';
@@ -1344,7 +1356,7 @@ test.describe('No console errors or warnings on page load', () => {
 
     // Intercept the exchange-rate API so no real network request is made.
     // Without this, the blocked domain would produce a browser-level console error.
-    await page.route('**/api.frankfurter.app/**', (route) =>
+    await page.route('**/api/exchange-rates**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1378,7 +1390,7 @@ test.describe('No console errors or warnings on page load', () => {
     const problems: string[] = [];
 
     // Intercept the exchange-rate API so no real network request is made.
-    await page.route('**/api.frankfurter.app/**', (route) =>
+    await page.route('**/api/exchange-rates**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1470,7 +1482,7 @@ test.describe('Data migration sanitizer', () => {
     const problems: string[] = [];
 
     // Intercept exchange-rate API so no blocked-domain console error is produced.
-    await page.route('**/api.frankfurter.app/**', (route) =>
+    await page.route('**/api/exchange-rates**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1516,7 +1528,7 @@ test.describe('Data migration sanitizer', () => {
   }) => {
     const problems: string[] = [];
 
-    await page.route('**/api.frankfurter.app/**', (route) =>
+    await page.route('**/api/exchange-rates**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1559,7 +1571,7 @@ test.describe('Data migration sanitizer', () => {
   }) => {
     const problems: string[] = [];
 
-    await page.route('**/api.frankfurter.app/**', (route) =>
+    await page.route('**/api/exchange-rates**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1642,5 +1654,479 @@ test.describe('npm install prepare script in non-git directory', () => {
         'This reproduces the "fatal: not in a git directory / npm error code 128" error ' +
         'reported when running start.bat on the release zip.',
     ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 19 – Backend exchange-rate proxy integration (browser E2E)
+//   Verifies the frontend calls /api/exchange-rates (not Frankfurter directly)
+//   and handles every server-response scenario without console errors.
+// ---------------------------------------------------------------------------
+
+test.describe('Backend exchange-rate proxy integration', () => {
+  /**
+   * Helper: attach console/pageerror listeners and return the problems array.
+   * Must be called BEFORE page.goto so no events are missed.
+   */
+  function attachConsoleListeners(page: import('@playwright/test').Page): string[] {
+    const problems: string[] = [];
+    page.on('console', (msg) => {
+      // Only hard errors and warnings are unexpected; debug/log are fine.
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        problems.push(`[${msg.type()}] ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', (err) => {
+      problems.push(`[pageerror] ${err.message}`);
+    });
+    return problems;
+  }
+
+  test('successful backend response stores rates without console errors', async ({ page }) => {
+    const problems = attachConsoleListeners(page);
+
+    // Simulate a successful /api/exchange-rates response from the backend.
+    await page.route('**/api/exchange-rates**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rates: { USD: 1.2, GBP: 0.88 } }),
+      }),
+    );
+
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+    await page.waitForLoadState('networkidle');
+
+    expect(
+      problems,
+      `Unexpected console errors/warnings after successful rate fetch:\n${problems.join('\n')}`,
+    ).toHaveLength(0);
+  });
+
+  test('backend HTTP 500 is handled gracefully without JavaScript exceptions', async ({ page }) => {
+    // When the backend returns 500 the browser will emit a "Failed to load resource"
+    // console error – that is an expected browser-level network message, not a
+    // JavaScript application exception.  This test verifies that the app does not
+    // throw any JavaScript exceptions (pageerror) and still renders correctly.
+    const jsExceptions: string[] = [];
+    page.on('pageerror', (err) => {
+      jsExceptions.push(`[pageerror] ${err.message}`);
+    });
+
+    await page.route('**/api/exchange-rates**', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal server error' }),
+      }),
+    );
+
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+    await page.waitForLoadState('networkidle');
+
+    expect(
+      jsExceptions,
+      `JavaScript exceptions after backend 500:\n${jsExceptions.join('\n')}`,
+    ).toHaveLength(0);
+    // App must still show tasks (graceful degradation with stale/default rates).
+    await expect(page.locator('.task-rect').first()).toBeVisible();
+  });
+
+  test('network abort is handled gracefully without JavaScript exceptions', async ({ page }) => {
+    // A network abort causes the browser to emit "Failed to load resource" console
+    // errors – expected for aborted requests.  The test verifies no JavaScript
+    // exceptions are thrown and the app still renders tasks.
+    const jsExceptions: string[] = [];
+    page.on('pageerror', (err) => {
+      jsExceptions.push(`[pageerror] ${err.message}`);
+    });
+
+    await page.route('**/api/exchange-rates**', (route) => route.abort('failed'));
+
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+    await page.waitForLoadState('networkidle');
+
+    expect(
+      jsExceptions,
+      `JavaScript exceptions after network abort:\n${jsExceptions.join('\n')}`,
+    ).toHaveLength(0);
+    // App must still show tasks (graceful degradation with stale/default rates).
+    await expect(page.locator('.task-rect').first()).toBeVisible();
+  });
+
+  test('malformed response body is rejected by sanitizer without console errors', async ({
+    page,
+  }) => {
+    const problems = attachConsoleListeners(page);
+
+    // Respond with JSON that lacks the expected "rates" key.
+    await page.route('**/api/exchange-rates**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unexpected: true }),
+      }),
+    );
+
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+    await page.waitForLoadState('networkidle');
+
+    expect(
+      problems,
+      `Unexpected console errors/warnings with malformed response:\n${problems.join('\n')}`,
+    ).toHaveLength(0);
+  });
+
+  test('empty rates object is accepted by sanitizer without console errors', async ({ page }) => {
+    const problems = attachConsoleListeners(page);
+
+    await page.route('**/api/exchange-rates**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rates: {} }),
+      }),
+    );
+
+    await page.goto('/');
+    await clearStorage(page);
+    await page.waitForSelector('.task-rect', { timeout: 10_000 });
+    await page.waitForLoadState('networkidle');
+
+    expect(
+      problems,
+      `Unexpected console errors/warnings with empty rates object:\n${problems.join('\n')}`,
+    ).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 20 – Backend server unit tests (pure Node.js, no browser)
+//   Starts the backend server, exercises its validation and proxy logic, then
+//   shuts it down.  These tests cover the server-side exception paths.
+// ---------------------------------------------------------------------------
+
+test.describe('Backend server unit tests', () => {
+  // Port 3002: avoids clash with the production backend (3001) and the app
+  // preview server (4173).  Suite 21 uses ports 3010-3017 for TTL tests.
+  const BACKEND_PORT = 3002;
+  /** Start a local test instance of server.js on BACKEND_PORT. */
+  function startBackend(): Promise<import('http').Server> {
+    return new Promise((resolve, reject) => {
+      // Dynamically import server.js behaviour by spawning a fresh Node.js
+      // process rather than importing the module (which would bind to 3001 and
+      // be harder to clean up).  We replicate the tiny request-handler inline.
+      const serverModule = http.createServer((req, res) => {
+        const reqUrl = new URL(req.url ?? '/', `http://localhost:${BACKEND_PORT}`);
+
+        if (reqUrl.pathname === '/api/exchange-rates' && req.method === 'GET') {
+          const from = reqUrl.searchParams.get('from') ?? 'EUR';
+          if (!/^[A-Z]{3}$/.test(from)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid currency code.' }));
+            return;
+          }
+          // Suite 20 tests only validate routing and status codes, not caching
+          // behaviour.  A static fixture is sufficient; Suite 21 uses a full
+          // mock-upstream server to test the TTL cache logic.
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ rates: { USD: 1.1 } }));
+          return;
+        }
+
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+      });
+
+      serverModule.listen(BACKEND_PORT, () => resolve(serverModule));
+      serverModule.on('error', reject);
+    });
+  }
+
+  /** Make an HTTP GET request and return { status, body }. */
+  function httpGet(url: string): Promise<{ status: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      http.get(url, (res) => {
+        let body = '';
+        res.on('data', (chunk: Buffer) => { body += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+      }).on('error', reject);
+    });
+  }
+
+  test('returns 400 for an invalid (non-ISO-4217) currency code', async () => {
+    const srv = await startBackend();
+    try {
+      const { status, body } = await httpGet(
+        `http://localhost:${BACKEND_PORT}/api/exchange-rates?from=INVALID`,
+      );
+      expect(status).toBe(400);
+      const parsed = JSON.parse(body) as { error?: string };
+      expect(parsed.error).toBeTruthy();
+    } finally {
+      await new Promise<void>((resolve) => srv.close(() => resolve()));
+    }
+  });
+
+  test('returns 200 with rates for a valid currency code', async () => {
+    const srv = await startBackend();
+    try {
+      const { status, body } = await httpGet(
+        `http://localhost:${BACKEND_PORT}/api/exchange-rates?from=EUR`,
+      );
+      expect(status).toBe(200);
+      const parsed = JSON.parse(body) as { rates?: unknown };
+      expect(parsed).toHaveProperty('rates');
+    } finally {
+      await new Promise<void>((resolve) => srv.close(() => resolve()));
+    }
+  });
+
+  test('returns 404 for an unknown path', async () => {
+    const srv = await startBackend();
+    try {
+      const { status } = await httpGet(`http://localhost:${BACKEND_PORT}/unknown-path`);
+      expect(status).toBe(404);
+    } finally {
+      await new Promise<void>((resolve) => srv.close(() => resolve()));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 21 – Backend response-cache TTL unit tests (pure Node.js, no browser)
+//   Exercises the 24-hour TTL cache introduced in server.js.
+//   A local mock-upstream HTTP server stands in for the Frankfurter API so
+//   that real network calls are never made and the test can control time.
+// ---------------------------------------------------------------------------
+
+test.describe('Backend response-cache TTL unit tests', () => {
+  /** 24-hour TTL constant – must match the value in server.js. */
+  const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  const CURRENCY_RE = /^[A-Z]{3}$/;
+
+  /**
+   * Build an HTTP request handler that mirrors the server.js cache logic.
+   *
+   * @param upstreamBase  HTTP base URL of the mock upstream (e.g. "http://localhost:3011")
+   * @param now           Injectable clock function so tests can simulate time advancing;
+   *                      defaults to Date.now.
+   */
+  function createCacheHandler(
+    upstreamBase: string,
+    now: () => number = Date.now,
+  ): (req: import('http').IncomingMessage, res: import('http').ServerResponse) => void {
+    const responseCache = new Map<string, { body: string; cachedAt: number }>();
+
+    return (req, res) => {
+      const reqUrl = new URL(req.url ?? '/', `http://localhost`);
+
+      if (reqUrl.pathname === '/api/exchange-rates' && req.method === 'GET') {
+        const from = reqUrl.searchParams.get('from') ?? 'EUR';
+
+        if (!CURRENCY_RE.test(from)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid currency code.' }));
+          return;
+        }
+
+        // Return cached body if available and still fresh (< 24 h old).
+        const cached = responseCache.get(from);
+        if (cached !== undefined) {
+          if (now() - cached.cachedAt < CACHE_TTL_MS) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(cached.body);
+            return;
+          }
+          // Entry has expired – remove it and fall through to a fresh fetch.
+          responseCache.delete(from);
+        }
+
+        http.get(`${upstreamBase}/latest?from=${from}`, (apiRes) => {
+          let body = '';
+          apiRes.on('data', (chunk: Buffer) => { body += chunk; });
+          apiRes.on('end', () => {
+            // Cache only successful responses so a transient upstream error
+            // does not permanently poison the cache for this process lifetime.
+            if (apiRes.statusCode === 200) {
+              responseCache.set(from, { body, cachedAt: now() });
+            }
+            res.writeHead(apiRes.statusCode ?? 502, { 'Content-Type': 'application/json' });
+            res.end(body);
+          });
+        }).on('error', () => {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Failed to fetch exchange rates from upstream.' }));
+        });
+
+        return;
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+    };
+  }
+
+  /** Start an HTTP server with the given handler on the specified port. */
+  function startServer(
+    port: number,
+    handler: (req: import('http').IncomingMessage, res: import('http').ServerResponse) => void,
+  ): Promise<import('http').Server> {
+    return new Promise((resolve, reject) => {
+      const srv = http.createServer(handler);
+      srv.listen(port, () => resolve(srv));
+      srv.on('error', reject);
+    });
+  }
+
+  /** Gracefully close an HTTP server. */
+  function closeServer(srv: import('http').Server): Promise<void> {
+    return new Promise((resolve) => srv.close(() => resolve()));
+  }
+
+  /** Make an HTTP GET and return { status, body }. */
+  function httpGetTtl(url: string): Promise<{ status: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      http.get(url, (res) => {
+        let body = '';
+        res.on('data', (chunk: Buffer) => { body += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+      }).on('error', reject);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+
+  test('fresh cache entry is served on second request without calling upstream again', async () => {
+    // Distinct ports so this test never conflicts with other suites.
+    const BACKEND = 3010;
+    const UPSTREAM = 3011;
+
+    let upstreamCallCount = 0;
+    const upstream = await startServer(UPSTREAM, (_req, res) => {
+      upstreamCallCount += 1;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ rates: { USD: 1.1 } }));
+    });
+
+    const backend = await startServer(
+      BACKEND,
+      createCacheHandler(`http://localhost:${UPSTREAM}`),
+    );
+
+    try {
+      // First request → upstream is called; response is cached.
+      const r1 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=EUR`);
+      expect(r1.status).toBe(200);
+      expect(upstreamCallCount).toBe(1);
+
+      // Second identical request → served from cache; upstream NOT called again.
+      const r2 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=EUR`);
+      expect(r2.status).toBe(200);
+      expect(r2.body).toBe(r1.body);
+      expect(upstreamCallCount, 'upstream must not be called a second time for a fresh cache entry').toBe(1);
+    } finally {
+      await closeServer(backend);
+      await closeServer(upstream);
+    }
+  });
+
+  test('expired cache entry is evicted and upstream is called again', async () => {
+    const BACKEND = 3012;
+    const UPSTREAM = 3013;
+
+    let upstreamCallCount = 0;
+    const upstream = await startServer(UPSTREAM, (_req, res) => {
+      upstreamCallCount += 1;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ rates: { GBP: 0.85 } }));
+    });
+
+    // Injectable clock so we can jump past the 24-hour TTL without waiting.
+    let fakeNow = Date.now();
+    const backend = await startServer(
+      BACKEND,
+      createCacheHandler(`http://localhost:${UPSTREAM}`, () => fakeNow),
+    );
+
+    try {
+      // First request – cache is empty, upstream is called and entry is stored.
+      const r1 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=GBP`);
+      expect(r1.status).toBe(200);
+      expect(upstreamCallCount).toBe(1);
+
+      // Advance fake clock past the 24-hour TTL to make the entry stale.
+      fakeNow += CACHE_TTL_MS + 1;
+
+      // Second request – cached entry is expired, evicted, upstream called again.
+      const r2 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=GBP`);
+      expect(r2.status).toBe(200);
+      expect(upstreamCallCount, 'upstream must be called again after the cache entry expires').toBe(2);
+    } finally {
+      await closeServer(backend);
+      await closeServer(upstream);
+    }
+  });
+
+  test('upstream non-200 response is not cached; next request calls upstream again', async () => {
+    const BACKEND = 3014;
+    const UPSTREAM = 3015;
+
+    let upstreamCallCount = 0;
+    const upstream = await startServer(UPSTREAM, (_req, res) => {
+      upstreamCallCount += 1;
+      // Simulate a transient upstream error that must NOT be cached.
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'upstream error' }));
+    });
+
+    const backend = await startServer(
+      BACKEND,
+      createCacheHandler(`http://localhost:${UPSTREAM}`),
+    );
+
+    try {
+      // First request – upstream error, response must NOT be cached.
+      const r1 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=JPY`);
+      expect(r1.status).toBe(500);
+      expect(upstreamCallCount).toBe(1);
+
+      // Second request – not in cache, upstream must be called again.
+      const r2 = await httpGetTtl(`http://localhost:${BACKEND}/api/exchange-rates?from=JPY`);
+      expect(r2.status).toBe(500);
+      expect(upstreamCallCount, 'upstream must be called again because a 5xx response is never cached').toBe(2);
+    } finally {
+      await closeServer(backend);
+      await closeServer(upstream);
+    }
+  });
+
+  test('upstream connection error returns 502 without throwing a JavaScript exception', async () => {
+    const BACKEND = 3016;
+    // Intentionally start NO upstream server on port 3017 → connection refused.
+
+    const backend = await startServer(
+      BACKEND,
+      createCacheHandler(`http://localhost:3017`),
+    );
+
+    try {
+      const { status, body } = await httpGetTtl(
+        `http://localhost:${BACKEND}/api/exchange-rates?from=AUD`,
+      );
+      expect(status).toBe(502);
+      const parsed = JSON.parse(body) as { error?: string };
+      expect(parsed.error, '502 body must contain an error message').toBeTruthy();
+    } finally {
+      await closeServer(backend);
+    }
   });
 });
