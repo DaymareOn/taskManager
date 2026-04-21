@@ -9,6 +9,7 @@ import { ConceptsOverlay } from './components/ConceptsOverlay';
 import { TaskForm } from './components/TaskForm';
 import { KeyboardConfigManager } from './utils/keyboardConfig';
 import { ConceptsConfigManager } from './utils/conceptsConfig';
+import { DataModelOverlay } from './components/DataModelOverlay';
 import { DOM } from './utils/dom';
 import { showModal } from './utils/modal';
 import { t } from './utils/i18n';
@@ -33,11 +34,13 @@ const editTaskColumn  = EditTaskColumn();
 const { element: timelineEl, getHoveredTaskId } = Timeline(editTaskColumn.openTask);
 const keyboardOverlay = KeyboardOverlay();
 const conceptsOverlay = ConceptsOverlay();
+const dataModelOverlay = DataModelOverlay();
 
 DOM.append(app, toolsColumn, timelineEl, editTaskColumn.element);
 // Overlays are mounted at body level so they sit above everything
 document.body.appendChild(keyboardOverlay.element);
 document.body.appendChild(conceptsOverlay.element);
+document.body.appendChild(dataModelOverlay.element);
 
 // Load persisted data
 useTaskStore.getState().loadTasks();
@@ -52,6 +55,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (keyboardOverlay.isOpen()) { keyboardOverlay.close(); return; }
     if (conceptsOverlay.isOpen()) { conceptsOverlay.close(); return; }
+    if (dataModelOverlay.isOpen()) { dataModelOverlay.close(); return; }
     return;
   }
 
@@ -136,9 +140,16 @@ document.addEventListener('keydown', (e) => {
     if (!keyboardOverlay.isOpen()) conceptsOverlay.open();
     return;
   }
+
+  if (e.key === 'F3' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    if (!conceptsOverlay.isOpen() && !keyboardOverlay.isOpen()) dataModelOverlay.open();
+    return;
+  }
 });
 
 // ---- Custom events from ToolsColumn buttons ----
 document.addEventListener('open-keyboard-overlay', () => { keyboardOverlay.open(); });
 document.addEventListener('open-concepts-overlay', () => { conceptsOverlay.open(); });
+document.addEventListener('open-datamodel-overlay', () => { dataModelOverlay.open(); });
 

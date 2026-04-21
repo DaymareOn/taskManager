@@ -94,6 +94,13 @@ export const en_US: Record<string, string> = {
   'concepts.closeHint': 'Press Esc to close.',
   'concepts.close': 'Close',
 
+  // Data model overlay
+  'dataModel.title': '📐 Data Model Class Diagram',
+  'dataModel.closeHint': 'Press Esc to close.',
+  'dataModel.close': 'Close',
+  'tools.dataModelKey': '📐 Data model diagram (F3)',
+  'tools.openDataModel': '📐 Open data model diagram',
+
   // Input device labels
   'device.keyboardMouse': 'Keyboard & Mouse',
   'device.keyboardTrackpad': 'Keyboard & Trackpad',
