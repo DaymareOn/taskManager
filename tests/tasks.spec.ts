@@ -2160,7 +2160,7 @@ test.describe("'d' key shortcut deletes task in EditTaskColumn", () => {
 
     await expect(page.locator('.edit-task-column')).not.toHaveClass(/collapsed/, { timeout: 5_000 });
 
-    await page.locator('.edit-task-column-inner').click();
+    await page.locator('.edit-column-title').click();
     page.once('dialog', (dialog) => dialog.accept());
     await page.keyboard.press('d');
 
