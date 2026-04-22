@@ -187,9 +187,14 @@ export function computeBoostedScores(
   }
 
   // Iteratively apply the boost until no more changes occur (handles chains).
+  // The maximum number of iterations is bounded by tasks.length to guard against
+  // circular dependencies (A→B→A) that would otherwise cause an infinite loop.
+  const maxIterations = tasks.length;
+  let iterations = 0;
   let changed = true;
-  while (changed) {
+  while (changed && iterations < maxIterations) {
     changed = false;
+    iterations++;
     for (const task of tasks) {
       if (!task.dependsOn) continue;
       const scoreA = scores.get(task.id) ?? 0;
