@@ -25,6 +25,8 @@
     },
     "assignee": "Alice Martin"
   },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
     "title": "Schedule roof cleaning appointment",
     "description": "Call the roof maintenance company to schedule a cleaning and inspection. Last done 18 months ago — check for moss and blocked gutters.",
     "status": "todo",
@@ -226,6 +228,8 @@
     },
     "assignee": "Bob Chen"
   },
+  {
+    "id": "00000000-0000-0000-0000-000000000010",
     "title": "Fix leaky bathroom faucet",
     "description": "The cold tap in the bathroom has been dripping for a week. Replace the washer or call a plumber if the cartridge is worn. Turn off water supply before starting.",
     "status": "todo",
@@ -320,6 +324,8 @@
     },
     "assignee": "Bob Chen"
   },
+  {
+    "id": "00000000-0000-0000-0000-000000000014",
     "title": "Donate old clothes and toys",
     "description": "Sort through the kids' outgrown clothes, unused toys, and old books. Bag items in good condition for the local charity shop and arrange a drop-off.",
     "status": "done",
