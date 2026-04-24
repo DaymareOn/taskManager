@@ -391,6 +391,7 @@ export const Timeline = (onEditTask?: (task: Task) => void): TimelineApi => {
     }
 
     const container = DOM.create('div', 'task-action-modal');
+    // eslint-disable-next-line prefer-const
     let closeModal: () => void;
 
     const editForm = TaskForm(
@@ -405,6 +406,7 @@ export const Timeline = (onEditTask?: (task: Task) => void): TimelineApi => {
     const subTaskBtn = DOM.create('button', 'btn btn-secondary', '+ Add Sub-task');
     subTaskBtn.addEventListener('click', () => {
       closeModal();
+      // eslint-disable-next-line prefer-const
       let closeSub: () => void;
       const subForm = TaskForm(
         (subData) => {
@@ -440,6 +442,7 @@ export const Timeline = (onEditTask?: (task: Task) => void): TimelineApi => {
     const clickTimeMs = xToTime(clickX, store.timelineOriginMs, store.horizontalZoom);
     const clickDate = new Date(clickTimeMs).toISOString().split('T')[0];
 
+    // eslint-disable-next-line prefer-const
     let closeAdd: () => void;
     const addForm = TaskForm(
       (taskData) => {
@@ -555,8 +558,62 @@ export const Timeline = (onEditTask?: (task: Task) => void): TimelineApi => {
     renderCanvas();
   });
 
+  // -------- Autozoom --------
+  // Guard flag to prevent the subscriber from re-entering itself while
+  // applyAutozoom() is writing new zoom values back to the store.
+  let isApplyingAutozoom = false;
+
+  /**
+   * Compute and apply zoom/pan values so that all visible tasks fill the
+   * available timeline space (both horizontally and vertically).
+   */
+  function applyAutozoom(): void {
+    const store = useTaskStore.getState();
+    const tasks = getSortedRootTasks();
+    if (tasks.length === 0) return;
+
+    const now = Date.now();
+    const bodyWidth = body.clientWidth || outer.clientWidth || 800;
+    const bodyHeight = body.clientHeight || 400;
+
+    // ---- Horizontal: fit all tasks within body width ----
+    const minStartMs = Math.min(...tasks.map((t) => getTaskStartMs(t)));
+    const maxEndMs = Math.max(...tasks.map((t) => getTaskEndMs(t, now)));
+    const spanMs = maxEndMs - minStartMs;
+
+    let newHZoom = store.horizontalZoom;
+    let newOriginMs = store.timelineOriginMs;
+
+    if (spanMs > 0 && bodyWidth > 0) {
+      // pxPerMs * spanMs = bodyWidth  →  pxPerMs = bodyWidth / spanMs
+      // pxPerMs = (BASE_PX_PER_DAY / MS_PER_DAY) * (hZoom / 100)
+      // hZoom = 100 * (bodyWidth / spanMs) / (BASE_PX_PER_DAY / MS_PER_DAY)
+      newHZoom = Math.max(1, Math.min(10_000, (100 * bodyWidth * MS_PER_DAY) / (spanMs * BASE_PX_PER_DAY)));
+      newOriginMs = minStartMs;
+    }
+
+    // ---- Vertical: fit all task rows within body height ----
+    // totalHeight = tasks.length * (taskHeight * (vZoom/100) + TASK_GAP) = bodyHeight
+    // → vZoom = 100 * (bodyHeight / tasks.length - TASK_GAP) / taskHeight
+    let newVZoom = store.verticalZoom;
+    const effectiveRowHeight = bodyHeight / tasks.length - TASK_GAP;
+    if (effectiveRowHeight > 0) {
+      newVZoom = Math.max(10, Math.min(500, (100 * effectiveRowHeight) / store.taskHeight));
+    }
+
+    store.applyAutozoomValues(newHZoom, newVZoom, newOriginMs, 0);
+  }
+
   // -------- Store subscription --------
   useTaskStore.subscribe(() => {
+    if (!isApplyingAutozoom && useTaskStore.getState().autozoom) {
+      isApplyingAutozoom = true;
+      try {
+        applyAutozoom();
+      } finally {
+        isApplyingAutozoom = false;
+      }
+    }
     updateScrubber();
     renderRuler();
     renderCanvas();
@@ -564,6 +621,14 @@ export const Timeline = (onEditTask?: (task: Task) => void): TimelineApi => {
 
   // -------- Resize observer --------
   const resizeObs = new ResizeObserver(() => {
+    if (!isApplyingAutozoom && useTaskStore.getState().autozoom) {
+      isApplyingAutozoom = true;
+      try {
+        applyAutozoom();
+      } finally {
+        isApplyingAutozoom = false;
+      }
+    }
     renderRuler();
     renderCanvas();
   });
